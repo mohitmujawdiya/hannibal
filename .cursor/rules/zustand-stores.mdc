@@ -1,0 +1,51 @@
+---
+description: Zustand store patterns and the workspace context bridge
+globs: "**/stores/**"
+alwaysApply: false
+---
+
+# Zustand Store Conventions
+
+## Workspace Context Bridge (core store)
+
+This is the nervous system connecting all three panels. Located at `src/stores/workspace-context.ts`.
+
+```ts
+import { create } from "zustand";
+
+type ViewType =
+  | "overview" | "plan" | "prd" | "features"
+  | "roadmap" | "priorities" | "personas"
+  | "competitors" | "research" | "kanban";
+
+type SelectedEntity = {
+  type: "feature" | "plan" | "prd" | "persona" | "competitor" | "roadmapItem";
+  id: string;
+  data?: unknown;
+} | null;
+
+type WorkspaceContext = {
+  activeView: ViewType;
+  selectedEntity: SelectedEntity;
+  highlightedText: string | null;
+  setActiveView: (view: ViewType) => void;
+  setSelectedEntity: (entity: SelectedEntity) => void;
+  setHighlightedText: (text: string | null) => void;
+};
+
+export const useWorkspaceContext = create<WorkspaceContext>((set) => ({
+  activeView: "overview",
+  selectedEntity: null,
+  highlightedText: null,
+  setActiveView: (view) => set({ activeView: view, selectedEntity: null }),
+  setSelectedEntity: (entity) => set({ selectedEntity: entity }),
+  setHighlightedText: (text) => set({ highlightedText: text }),
+}));
+```
+
+## Rules
+- One store per concern: `workspace-context.ts`, `project-store.ts`
+- Use selectors to avoid unnecessary re-renders: `useWorkspaceContext((s) => s.activeView)`
+- Never put server-fetched data in Zustand — that goes through tRPC + TanStack Query
+- Zustand is for UI state only: active view, selections, panel open/closed, draft text
+- Keep stores flat — avoid deeply nested objects

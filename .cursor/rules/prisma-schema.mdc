@@ -1,0 +1,40 @@
+---
+description: Prisma schema and database conventions
+globs: "**/prisma/**"
+alwaysApply: false
+---
+
+# Prisma & Database Conventions
+
+## Naming
+- Models: PascalCase singular (`Feature`, `Plan`, `Conversation`)
+- Table names: mapped to snake_case plural via `@@map("features")`
+- Fields: camelCase in Prisma, snake_case in DB via `@map("field_name")`
+- Relations: named descriptively (`parent`, `children`, `project`, `author`)
+
+## Required Fields on Every Model
+
+```prisma
+model Feature {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // ... model-specific fields
+
+  @@map("features")
+}
+```
+
+## Patterns
+- Soft deletes: `deletedAt DateTime? @map("deleted_at")` on entities that need it (projects, features)
+- Ordering: explicit `order Int` field for user-reorderable lists (features, roadmap items)
+- Foreign keys: always `onDelete: Cascade` for child entities, `onDelete: SetNull` for optional refs
+- JSON fields: use `Json` type for flexible AI-generated content (plan sections, persona data)
+- Enums: define Prisma enums for status fields (`FeatureStatus`, `PlanStatus`)
+
+## Relations
+- Project is the top-level container — almost everything belongs to a project
+- Features have self-referential parent/child for the tree structure
+- Conversations have many Messages; Messages can reference Artifacts
+- Plans and PRDs link back to the Conversation that generated them

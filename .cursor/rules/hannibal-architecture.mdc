@@ -1,0 +1,50 @@
+---
+description: Hannibal project architecture - three-panel workspace, tech stack, and conventions
+alwaysApply: true
+---
+
+# Hannibal Architecture
+
+## Product
+Hannibal is an AI-native product management platform. Think "Cursor for PMs."
+
+## Tech Stack
+- Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui
+- Novel (AI-native Tiptap editor) for rich text surfaces (plans, PRDs)
+- React Flow for feature tree visualization
+- dnd-kit for drag-and-drop (kanban)
+- react-resizable-panels for the workspace layout
+- tRPC for type-safe API, Prisma + PostgreSQL for data
+- Vercel AI SDK (OpenAI GPT-4o) for AI streaming and tool calling
+- Zustand for client state, TanStack Query for server state
+- Clerk for auth
+
+## Workspace Layout (Three-Panel)
+```
+┌──────────┬──────────────────────┬──────────────┐
+│ Sidebar  │ Main Content Area    │ AI Panel     │
+│ (nav)    │ (active view)        │ (persistent) │
+└──────────┴──────────────────────┴──────────────┘
+```
+- Sidebar: project list + view switcher. Collapsible (Cmd+B).
+- Main Content: renders the active view (plan, PRD, features, roadmap, etc.). Views mount/unmount but preserve state via Zustand.
+- AI Panel: persistent chat. Context-aware of the active view. Collapsible (Cmd+L).
+- Panels use react-resizable-panels. Cmd+K opens command palette.
+
+## Context Bridge
+A Zustand store `useWorkspaceContext` connects all three panels:
+- Exposes: activeView, selectedEntity, highlightedText, projectId
+- Views write to it (e.g., selecting a feature node updates selectedEntity)
+- AI Panel reads from it to provide context-aware responses
+- AI Panel writes artifacts back, which views consume
+
+## Folder Structure
+- `src/app/(workspace)/[projectId]/layout.tsx` — workspace shell
+- `src/components/workspace/` — shell components (sidebar, ai-panel, main-content)
+- `src/components/views/` — main content views (plan-editor, feature-tree, roadmap, etc.)
+- `src/components/ai/` — AI panel sub-components (chat, artifacts, question cards)
+- `src/components/ui/` — shadcn/ui primitives
+- `src/server/routers/` — tRPC routers
+- `src/server/ai/` — AI orchestration (agents, prompts, tools)
+- `src/stores/` — Zustand stores
+- `prisma/` — schema and migrations

@@ -1,0 +1,70 @@
+---
+description: AI orchestration patterns with Vercel AI SDK
+globs: "**/server/ai/**"
+alwaysApply: false
+---
+
+# AI Orchestration Conventions
+
+## Stack
+- Vercel AI SDK (`ai` package) for streaming and tool calling
+- OpenAI GPT-4o as primary model
+- Tavily API for web research
+
+## Agent Pattern
+
+Each AI capability is a separate agent in `src/server/ai/agents/`:
+
+```ts
+import { openai } from "@ai-sdk/openai";
+import { generateText, tool } from "ai";
+import { z } from "zod";
+
+export async function researchAgent(query: string) {
+  const result = await generateText({
+    model: openai("gpt-4o"),
+    system: RESEARCH_SYSTEM_PROMPT,
+    prompt: query,
+    tools: {
+      webSearch: tool({
+        description: "Search the web for current information",
+        parameters: z.object({ query: z.string() }),
+        execute: async ({ query }) => {
+          // Tavily API call
+        },
+      }),
+    },
+  });
+  return result;
+}
+```
+
+## System Prompts
+- Stored in `src/server/ai/prompts/` as exported string constants
+- Each prompt includes: role definition, context template, output format spec
+- Context from the workspace (active view, selected entity) is injected at call time
+
+## Artifacts
+AI generates typed artifacts that map to database entities:
+
+```ts
+type ArtifactType = "plan" | "prd" | "persona" | "featureTree" | "competitor";
+
+type Artifact = {
+  type: ArtifactType;
+  title: string;
+  content: unknown; // type-narrowed by ArtifactType
+  sourceMessageId: string;
+};
+```
+
+Artifacts are:
+1. Rendered inline in the AI panel as collapsible previews
+2. Saved to the database as first-class entities when the PM clicks "Push to View"
+
+## Rules
+- Always stream responses for chat — use `streamText` not `generateText` for user-facing
+- Use `generateText` for background tasks (research, artifact generation)
+- Tool definitions live alongside their agent, not in a shared file
+- Include `maxTokens` and `temperature` explicitly — don't rely on defaults
+- Web research results must include source URLs for citation

@@ -1,0 +1,53 @@
+---
+description: tRPC router patterns and API conventions
+globs: "**/server/routers/**"
+alwaysApply: false
+---
+
+# tRPC Router Conventions
+
+## Structure
+- One router per domain: `project.ts`, `feature.ts`, `plan.ts`, `conversation.ts`, etc.
+- Merge all routers in `src/server/routers/_app.ts`
+- All procedures use Zod for input validation
+
+## Procedure Pattern
+
+```ts
+import { z } from "zod";
+import { protectedProcedure, router } from "../trpc";
+
+export const featureRouter = router({
+  list: protectedProcedure
+    .input(z.object({ projectId: z.string().cuid() }))
+    .query(async ({ ctx, input }) => {
+      return ctx.db.feature.findMany({
+        where: { projectId: input.projectId },
+        orderBy: { order: "asc" },
+      });
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      projectId: z.string().cuid(),
+      title: z.string().min(1).max(200),
+      parentId: z.string().cuid().nullable(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.db.feature.create({ data: input });
+    }),
+});
+```
+
+## Rules
+- Always use `protectedProcedure` (requires auth) unless explicitly public
+- Input validation: use `.min()`, `.max()` on strings; `.cuid()` on IDs
+- Return Prisma types directly — tRPC + Prisma types flow end-to-end
+- Errors: throw `TRPCError` with appropriate code (`NOT_FOUND`, `FORBIDDEN`, `BAD_REQUEST`)
+- Keep procedures thin — complex business logic goes in `src/server/services/`
+
+## Client Usage
+```tsx
+const { data, isLoading } = trpc.feature.list.useQuery({ projectId });
+const createFeature = trpc.feature.create.useMutation();
+```

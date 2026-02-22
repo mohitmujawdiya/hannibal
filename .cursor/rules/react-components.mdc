@@ -1,0 +1,48 @@
+---
+description: React component patterns and conventions for Hannibal
+globs: "**/*.tsx"
+alwaysApply: false
+---
+
+# React Component Conventions
+
+## General
+- Functional components only, named exports (no default exports except Next.js pages)
+- Props type defined inline or as `type XProps = {}` above the component (not interface)
+- Use `cn()` from `@/lib/utils` for conditional classnames with Tailwind
+- shadcn/ui is the base component library — extend it, don't reinvent
+
+## Naming
+- Components: PascalCase (`FeatureTree`, `AiPanel`)
+- Files: kebab-case (`feature-tree.tsx`, `ai-panel.tsx`)
+- Hooks: `use` prefix (`useWorkspaceContext`, `useProjectData`)
+- Event handlers: `on` prefix in props, `handle` prefix in implementation
+
+## Views (src/components/views/)
+Views are the main content area components. Every view must:
+1. Accept a `projectId` prop
+2. Register with the context bridge on mount via `useWorkspaceContext`
+3. Clean up context on unmount
+
+```tsx
+export function FeatureTreeView({ projectId }: { projectId: string }) {
+  const setActiveView = useWorkspaceContext((s) => s.setActiveView);
+  const setSelectedEntity = useWorkspaceContext((s) => s.setSelectedEntity);
+
+  useEffect(() => {
+    setActiveView("features");
+    return () => setSelectedEntity(null);
+  }, []);
+
+  // ...
+}
+```
+
+## AI Panel Components (src/components/ai/)
+- Chat messages render streaming content via Vercel AI SDK's `useChat`
+- Artifact previews are collapsible cards with a "Push to View" action
+- Question cards are interactive forms that resolve back to the chat
+
+## Imports
+- Use `@/` path alias for all imports from `src/`
+- Group: React/Next → external libs → @/components → @/lib → @/stores → relative
