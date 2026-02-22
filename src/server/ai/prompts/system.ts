@@ -61,11 +61,13 @@ export function buildSystemPrompt({
 
 ## Tools
 - **webSearch**: Use this proactively when you need real data — market stats, competitor info, industry trends. Don't make up numbers. After every web search, always synthesize the findings into a clear analysis for the PM — never leave search results without a follow-up response.
-- **generatePlan**: Use when asked to create an implementation plan or strategy.
-- **generatePRD**: Use when asked to create a PRD, product spec, or requirements doc.
+- **generatePlan**: Use when asked to create an implementation plan or strategy. Output markdown with ## headings (Problem Statement, Target Users, Proposed Solution, Technical Approach, Success Metrics, Risks, Timeline).
+- **generatePRD**: Use when asked to create a PRD, product spec, or requirements doc. Output markdown with ## headings (Overview, User Stories, Acceptance Criteria, Technical Constraints, Out of Scope, Success Metrics, Dependencies).
 - **generatePersona**: Use when asked to define user personas or target users.
-- **generateFeatureTree**: Use when asked to map features, decompose a product, or create a feature hierarchy.
+- **generateFeatureTree**: Use when asked to map features, decompose a product, or create a feature hierarchy. ALWAYS include a description for every feature node. Adapt the description to the feature's role: strategic summary for group/parent features, acceptance criteria and edge cases for leaf features, technical constraints for infrastructure features. Descriptions support markdown.
 - **generateCompetitor**: Use when asked to analyze a specific competitor.
+- **refineFeatureDescription**: Use when the PM asks to improve, rewrite, or add detail to a specific feature's description. Match the feature by title and parent path. Adapt the description to the feature's role — acceptance criteria for user-facing leaves, technical constraints for infra, strategic summary for groups. Use markdown formatting.
+- **suggestPriorities**: Use when asked to score, prioritize, or rank features. Only score **leaf features** (features with no children) — parent/group features derive their priority from their children. Provide RICE scores (Reach 1-10, Impact 0.25/0.5/1/2/3, Confidence 50/80/100, Effort in person-weeks minimum 0.5) for each leaf. Include a brief rationale for each score.
 
 After using any generate tool, write a brief summary of what you generated and ask if the PM wants to refine anything.
 
@@ -78,27 +80,59 @@ After using any generate tool, write a brief summary of what you generated and a
 ${artifactSection}${contextSection}`;
 }
 
+function serializeFeatureNode(node: { title: string; description?: string; children?: { title: string; description?: string; children?: unknown[] }[]; reach?: number; impact?: number; confidence?: number; effort?: number }, indent = ""): string {
+  const scores = [node.reach, node.impact, node.confidence, node.effort].some(v => v != null)
+    ? ` [R:${node.reach ?? "?"} I:${node.impact ?? "?"} C:${node.confidence ?? "?"}% E:${node.effort ?? "?"}w]`
+    : "";
+  const desc = node.description ? ` — ${node.description.split("\n")[0].slice(0, 120)}` : "";
+  let line = `${indent}- ${node.title}${scores}${desc}`;
+  if (node.children?.length) {
+    for (const child of node.children) {
+      line += "\n" + serializeFeatureNode(child as Parameters<typeof serializeFeatureNode>[0], indent + "  ");
+    }
+  }
+  return line;
+}
+
 function buildArtifactContext(artifacts: StoredArtifact[]): string {
   if (artifacts.length === 0) return "";
 
-  const summaries = artifacts.map((a) => {
+  const MAX_CONTENT = 2000;
+  const sections: string[] = [];
+
+  for (const a of artifacts) {
     switch (a.type) {
-      case "plan":
-        return `- [Plan] "${a.title}" — Problem: ${a.sections.problemStatement.slice(0, 100)}... | ${a.sections.targetUsers.length} user segments, ${a.sections.risks.length} risks identified`;
-      case "prd":
-        return `- [PRD] "${a.title}" — ${a.sections.userStories.length} user stories, ${a.sections.acceptanceCriteria.length} acceptance criteria`;
+      case "plan": {
+        const content = a.content || a.sections?.problemStatement || "";
+        const truncated = content.length > MAX_CONTENT ? content.slice(0, MAX_CONTENT) + "\n...(truncated)" : content;
+        sections.push(`### [Plan] "${a.title}"\n${truncated}`);
+        break;
+      }
+      case "prd": {
+        const content = a.content || a.sections?.overview || "";
+        const truncated = content.length > MAX_CONTENT ? content.slice(0, MAX_CONTENT) + "\n...(truncated)" : content;
+        sections.push(`### [PRD] "${a.title}"\n${truncated}`);
+        break;
+      }
       case "persona":
-        return `- [Persona] "${a.name}" — ${a.demographics} | Goals: ${a.goals.slice(0, 2).join(", ")}`;
-      case "featureTree":
-        return `- [Feature Tree] "${a.rootFeature}" — ${a.children.length} top-level features`;
+        sections.push(`### [Persona] "${a.name}"\n- Demographics: ${a.demographics}\n- Goals: ${a.goals.join(", ")}\n- Frustrations: ${a.frustrations.join(", ")}\n- Behaviors: ${a.behaviors.join(", ")}\n- Tech: ${a.techProficiency}\n- Quote: "${a.quote}"`);
+        break;
+      case "featureTree": {
+        const tree = a.children.map(c => serializeFeatureNode(c)).join("\n");
+        const truncated = tree.length > MAX_CONTENT ? tree.slice(0, MAX_CONTENT) + "\n...(truncated)" : tree;
+        sections.push(`### [Feature Tree] "${a.rootFeature}"\n${truncated}`);
+        break;
+      }
       case "competitor":
-        return `- [Competitor] "${a.name}" — ${a.positioning.slice(0, 80)}`;
+        sections.push(`### [Competitor] "${a.name}"${a.url ? ` (${a.url})` : ""}\n- Positioning: ${a.positioning}\n- Strengths: ${a.strengths.join(", ")}\n- Weaknesses: ${a.weaknesses.join(", ")}\n- Feature gaps: ${a.featureGaps.join(", ")}${a.pricing ? `\n- Pricing: ${a.pricing}` : ""}`);
+        break;
     }
-  });
+  }
 
   return `
-## Existing Artifacts (already generated — reference these, don't recreate)
+## Current Artifact State (AUTHORITATIVE — always use this over conversation history, as the PM may have edited artifacts since earlier messages)
 The PM has ${artifacts.length} artifact(s) in their workspace:
-${summaries.join("\n")}
+
+${sections.join("\n\n")}
 `;
 }

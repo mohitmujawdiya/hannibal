@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -17,10 +17,15 @@ type WorkspaceShellProps = {
 };
 
 export function WorkspaceShell({ projectId, projectName }: WorkspaceShellProps) {
+  const [mounted, setMounted] = useState(false);
   const sidebarOpen = useWorkspaceContext((s) => s.sidebarOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const toggleSidebar = useWorkspaceContext((s) => s.toggleSidebar);
   const toggleAiPanel = useWorkspaceContext((s) => s.toggleAiPanel);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -36,6 +41,15 @@ export function WorkspaceShell({ projectId, projectName }: WorkspaceShellProps) 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar, toggleAiPanel]);
+
+  // Defer ResizablePanelGroup until after hydration to avoid id/data-testid mismatch
+  if (!mounted) {
+    return (
+      <div className="flex h-screen w-screen overflow-hidden bg-background">
+        <div className="flex flex-1 min-w-0" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
@@ -67,6 +81,7 @@ export function WorkspaceShell({ projectId, projectName }: WorkspaceShellProps) 
               defaultSize="30%"
               minSize="18%"
               maxSize="45%"
+              className="overflow-hidden"
             >
               <AiPanel projectId={projectId} />
             </ResizablePanel>

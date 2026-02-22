@@ -1,29 +1,38 @@
 "use client";
 
 import { useEffect } from "react";
-import {
-  ClipboardList,
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  TrendingUp,
-  Link2,
-  Users,
-  Sparkles,
-} from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ClipboardList, Sparkles, Copy, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { usePrds } from "@/stores/artifact-store";
+import { useArtifactStore, usePrds } from "@/stores/artifact-store";
+import { MarkdownDoc } from "@/components/editor/markdown-doc";
+import { prdToMarkdown } from "@/lib/artifact-to-markdown";
+import type { PrdArtifact } from "@/lib/artifact-types";
+
+function getPrdContent(prd: PrdArtifact): string {
+  if (prd.content != null && prd.content.trim()) return prd.content;
+  if (prd.sections) return prdToMarkdown(prd);
+  return "";
+}
 
 export function PrdEditorView({ projectId }: { projectId: string }) {
   const prds = usePrds();
+  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const removeArtifact = useArtifactStore((s) => s.removeArtifact);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
 
   useEffect(() => {
     useWorkspaceContext.getState().setActiveView("prd");
   }, []);
+
+  // Must run unconditionally (Rules of Hooks)
+  const prd = prds.length > 0 ? prds[prds.length - 1] : null;
+  useEffect(() => {
+    if (!prd?.sections || (prd.content != null && prd.content.trim())) return;
+    const content = prdToMarkdown(prd);
+    updateArtifact(prd.id, { content, sections: undefined } as Partial<PrdArtifact>);
+  }, [prd?.id, prd?.sections, prd?.content, updateArtifact]);
 
   if (prds.length === 0) {
     return (
@@ -51,144 +60,54 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
     );
   }
 
-  const prd = prds[prds.length - 1];
+  const activePrd = prd!;
+  const content = getPrdContent(activePrd);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(prdToMarkdown(activePrd));
+  };
+
+  const toolbarActions = (
+    <>
+      <Button variant="ghost" size="sm" className="h-7" onClick={handleCopy}>
+        <Copy className="h-3.5 w-3.5 mr-1" />
+        Copy
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 text-destructive hover:text-destructive"
+        onClick={() => removeArtifact(activePrd.id)}
+      >
+        <Trash2 className="h-3.5 w-3.5 mr-1" />
+        Delete
+      </Button>
+      {prds.length > 1 && (
+        <Badge variant="secondary" className="text-xs">
+          {prds.length} versions
+        </Badge>
+      )}
+    </>
+  );
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 py-[16px] flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold">{prd.title}</h2>
-          <p className="text-xs text-muted-foreground">
-            Product Requirements Document
-          </p>
-        </div>
-        {prds.length > 1 && (
-          <Badge variant="secondary" className="text-xs">
-            {prds.length} versions
-          </Badge>
-        )}
+      <div className="border-b border-border px-6 py-[16px]">
+        <h2 className="text-sm font-semibold">{activePrd.title}</h2>
+        <p className="text-xs text-muted-foreground">Product Requirements Document</p>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-3xl mx-auto space-y-6">
-          <PrdSection icon={FileText} title="Overview" color="text-blue-400">
-            <p className="text-sm leading-relaxed">
-              {prd.sections.overview}
-            </p>
-          </PrdSection>
-
-          <PrdSection icon={Users} title="User Stories" color="text-purple-400">
-            <ul className="space-y-2">
-              {prd.sections.userStories.map((story, i) => (
-                <li
-                  key={i}
-                  className="text-sm bg-muted/50 rounded-lg px-3 py-2"
-                >
-                  {story}
-                </li>
-              ))}
-            </ul>
-          </PrdSection>
-
-          <PrdSection
-            icon={CheckCircle2}
-            title="Acceptance Criteria"
-            color="text-green-400"
-          >
-            <ul className="space-y-1.5">
-              {prd.sections.acceptanceCriteria.map((criteria, i) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-400 mt-0.5 shrink-0" />
-                  {criteria}
-                </li>
-              ))}
-            </ul>
-          </PrdSection>
-
-          <PrdSection
-            icon={AlertTriangle}
-            title="Technical Constraints"
-            color="text-orange-400"
-          >
-            <ul className="space-y-1.5">
-              {prd.sections.technicalConstraints.map((constraint, i) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-orange-400 shrink-0" />
-                  {constraint}
-                </li>
-              ))}
-            </ul>
-          </PrdSection>
-
-          <PrdSection
-            icon={XCircle}
-            title="Out of Scope"
-            color="text-red-400"
-          >
-            <ul className="space-y-1.5">
-              {prd.sections.outOfScope.map((item, i) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <XCircle className="h-3.5 w-3.5 text-red-400 mt-0.5 shrink-0" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </PrdSection>
-
-          <PrdSection
-            icon={TrendingUp}
-            title="Success Metrics"
-            color="text-green-400"
-          >
-            <ul className="space-y-1.5">
-              {prd.sections.successMetrics.map((metric, i) => (
-                <li key={i} className="text-sm flex items-start gap-2">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-green-400 shrink-0" />
-                  {metric}
-                </li>
-              ))}
-            </ul>
-          </PrdSection>
-
-          <PrdSection
-            icon={Link2}
-            title="Dependencies"
-            color="text-cyan-400"
-          >
-            <div className="flex flex-wrap gap-2">
-              {prd.sections.dependencies.map((dep, i) => (
-                <Badge key={i} variant="secondary">
-                  {dep}
-                </Badge>
-              ))}
-            </div>
-          </PrdSection>
+        <div className="max-w-3xl mx-auto">
+          <MarkdownDoc
+            value={content}
+            onChange={(v) => updateArtifact(activePrd.id, { content: v } as Partial<PrdArtifact>)}
+            placeholder="Product requirements..."
+            minHeight="min-h-[400px]"
+            toolbarActions={toolbarActions}
+          />
         </div>
       </div>
     </div>
-  );
-}
-
-function PrdSection({
-  icon: Icon,
-  title,
-  color,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  color: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Icon className={`h-4 w-4 ${color}`} />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
   );
 }

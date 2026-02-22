@@ -9,14 +9,19 @@ import {
   DollarSign,
   AlertCircle,
   Sparkles,
+  Copy,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useCompetitors } from "@/stores/artifact-store";
+import { useArtifactStore, useCompetitors } from "@/stores/artifact-store";
+import { competitorToMarkdown } from "@/lib/artifact-to-markdown";
 
 export function CompetitorMatrixView({ projectId }: { projectId: string }) {
   const competitors = useCompetitors();
+  const removeArtifact = useArtifactStore((s) => s.removeArtifact);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
 
   useEffect(() => {
@@ -49,13 +54,24 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
     );
   }
 
+  const handleCopy = () => {
+    const markdown = competitors.map((c) => competitorToMarkdown(c)).join("\n\n---\n\n");
+    navigator.clipboard.writeText(markdown);
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-6 py-[16px] flex items-center justify-between">
         <h2 className="text-sm font-semibold">Competitive Analysis</h2>
-        <Badge variant="secondary" className="text-xs">
-          {competitors.length} competitor{competitors.length !== 1 ? "s" : ""}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-7" onClick={handleCopy}>
+            <Copy className="h-3.5 w-3.5 mr-1" />
+            Copy
+          </Button>
+          <Badge variant="secondary" className="text-xs">
+            {competitors.length} competitor{competitors.length !== 1 ? "s" : ""}
+          </Badge>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -82,12 +98,23 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                       {comp.positioning}
                     </p>
                   </div>
-                  {comp.pricing && (
-                    <Badge variant="outline" className="text-[10px] shrink-0">
-                      <DollarSign className="h-3 w-3 mr-0.5" />
-                      {comp.pricing}
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeArtifact(comp.id)}
+                      aria-label="Delete competitor"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    {comp.pricing && (
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        <DollarSign className="h-3 w-3 mr-0.5" />
+                        {comp.pricing}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

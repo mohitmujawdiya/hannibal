@@ -9,14 +9,19 @@ import {
   Monitor,
   Quote,
   Sparkles,
+  Copy,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { usePersonas } from "@/stores/artifact-store";
+import { useArtifactStore, usePersonas } from "@/stores/artifact-store";
+import { personaToMarkdown } from "@/lib/artifact-to-markdown";
 
 export function PersonaCardsView({ projectId }: { projectId: string }) {
   const personas = usePersonas();
+  const removeArtifact = useArtifactStore((s) => s.removeArtifact);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
 
   useEffect(() => {
@@ -49,13 +54,24 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
     );
   }
 
+  const handleCopy = () => {
+    const markdown = personas.map((p) => personaToMarkdown(p)).join("\n\n---\n\n");
+    navigator.clipboard.writeText(markdown);
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-6 py-[16px] flex items-center justify-between">
         <h2 className="text-sm font-semibold">User Personas</h2>
-        <Badge variant="secondary" className="text-xs">
-          {personas.length} persona{personas.length !== 1 ? "s" : ""}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-7" onClick={handleCopy}>
+            <Copy className="h-3.5 w-3.5 mr-1" />
+            Copy
+          </Button>
+          <Badge variant="secondary" className="text-xs">
+            {personas.length} persona{personas.length !== 1 ? "s" : ""}
+          </Badge>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -70,10 +86,21 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                       {persona.demographics}
                     </p>
                   </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">
-                    <Monitor className="h-3 w-3 mr-1" />
-                    {persona.techProficiency}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeArtifact(persona.id)}
+                      aria-label="Delete persona"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                      <Monitor className="h-3 w-3 mr-1" />
+                      {persona.techProficiency}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

@@ -17,9 +17,10 @@ function ResizablePanelGroup({
 }
 
 function ResizablePanel({
+  className,
   ...props
-}: React.ComponentProps<typeof Panel>) {
-  return <Panel {...props} />;
+}: React.ComponentProps<typeof Panel> & { className?: string }) {
+  return <Panel className={cn("min-w-0", className)} {...props} />;
 }
 
 function ResizableHandle({
@@ -29,7 +30,7 @@ function ResizableHandle({
   return (
     <Separator
       className={cn(
-        "relative bg-border/60 transition-colors",
+        "relative bg-border/60 transition-colors z-20",
         "data-[resize-handle-state=hover]:bg-primary/30",
         "data-[resize-handle-state=drag]:bg-primary/50",
         "data-[panel-group-direction=horizontal]:w-[3px]",
@@ -38,6 +39,8 @@ function ResizableHandle({
       )}
       {...props}
     >
+      {/* Invisible wider hit target */}
+      <div className="absolute inset-y-0 -left-1 -right-1 z-20" />
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="z-10 flex h-6 w-[3px] flex-col items-center justify-center gap-[2px] rounded-full">
           <span className="h-[3px] w-[3px] rounded-full bg-muted-foreground/40" />

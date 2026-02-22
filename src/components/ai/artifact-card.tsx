@@ -105,25 +105,47 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
 function ArtifactPreview({ artifact }: { artifact: Artifact }) {
   switch (artifact.type) {
     case "plan":
-      return (
-        <div className="space-y-2 text-xs">
-          <Section label="Problem" content={artifact.sections.problemStatement} />
-          <Section label="Solution" content={artifact.sections.proposedSolution} />
-          <ListSection label="Target Users" items={artifact.sections.targetUsers} />
-          <ListSection label="Success Metrics" items={artifact.sections.successMetrics} />
-          <ListSection label="Risks" items={artifact.sections.risks} />
-          <Section label="Timeline" content={artifact.sections.timeline} />
-        </div>
-      );
+      if (artifact.content) {
+        return (
+          <div className="text-xs prose prose-sm dark:prose-invert max-w-none line-clamp-6 whitespace-pre-wrap">
+            {artifact.content.slice(0, 400)}
+            {artifact.content.length > 400 ? "…" : ""}
+          </div>
+        );
+      }
+      if (artifact.sections) {
+        return (
+          <div className="space-y-2 text-xs">
+            <Section label="Problem" content={artifact.sections.problemStatement} />
+            <Section label="Solution" content={artifact.sections.proposedSolution} />
+            <ListSection label="Target Users" items={artifact.sections.targetUsers} />
+            <ListSection label="Success Metrics" items={artifact.sections.successMetrics} />
+            <ListSection label="Risks" items={artifact.sections.risks} />
+            <Section label="Timeline" content={artifact.sections.timeline} />
+          </div>
+        );
+      }
+      return null;
     case "prd":
-      return (
-        <div className="space-y-2 text-xs">
-          <Section label="Overview" content={artifact.sections.overview} />
-          <ListSection label="User Stories" items={artifact.sections.userStories} />
-          <ListSection label="Acceptance Criteria" items={artifact.sections.acceptanceCriteria} />
-          <ListSection label="Out of Scope" items={artifact.sections.outOfScope} />
-        </div>
-      );
+      if (artifact.content) {
+        return (
+          <div className="text-xs prose prose-sm dark:prose-invert max-w-none line-clamp-6 whitespace-pre-wrap">
+            {artifact.content.slice(0, 400)}
+            {artifact.content.length > 400 ? "…" : ""}
+          </div>
+        );
+      }
+      if (artifact.sections) {
+        return (
+          <div className="space-y-2 text-xs">
+            <Section label="Overview" content={artifact.sections.overview} />
+            <ListSection label="User Stories" items={artifact.sections.userStories} />
+            <ListSection label="Acceptance Criteria" items={artifact.sections.acceptanceCriteria} />
+            <ListSection label="Out of Scope" items={artifact.sections.outOfScope} />
+          </div>
+        );
+      }
+      return null;
     case "persona":
       return (
         <div className="space-y-2 text-xs">
@@ -229,9 +251,13 @@ function getArtifactTitle(artifact: Artifact): string {
 function getArtifactSummary(artifact: Artifact): string {
   switch (artifact.type) {
     case "plan":
-      return artifact.sections.problemStatement.slice(0, 120);
+      if (artifact.content) return artifact.content.slice(0, 120);
+      if (artifact.sections) return artifact.sections.problemStatement.slice(0, 120);
+      return "";
     case "prd":
-      return artifact.sections.overview.slice(0, 120);
+      if (artifact.content) return artifact.content.slice(0, 120);
+      if (artifact.sections) return artifact.sections.overview.slice(0, 120);
+      return "";
     case "persona":
       return `${artifact.demographics} — "${artifact.quote}"`.slice(0, 120);
     case "featureTree":

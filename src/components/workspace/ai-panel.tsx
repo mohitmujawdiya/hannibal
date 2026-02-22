@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import {
   PanelRightClose,
   Send,
@@ -20,7 +21,8 @@ import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { ArtifactCard } from "@/components/ai/artifact-card";
 import { localChatStore } from "@/lib/chat-persistence";
-import type { Artifact } from "@/lib/artifact-types";
+import type { Artifact, FeatureNode } from "@/lib/artifact-types";
+import { useFeatureTrees } from "@/stores/artifact-store";
 
 type AiPanelProps = {
   projectId: string;
@@ -48,16 +50,23 @@ export function AiPanel({ projectId }: AiPanelProps) {
     },
   ], []);
 
+  const bodyRef = useRef({ activeView, selectedEntity, highlightedText, artifacts });
+  bodyRef.current = { activeView, selectedEntity, highlightedText, artifacts };
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: () => ({
+          ...bodyRef.current,
+          projectName: "Demo Project",
+        }),
+      }),
+    [],
+  );
+
   const { messages, setMessages, sendMessage, status, stop } = useChat({
-    api: "/api/chat",
-    body: {
-      activeView,
-      selectedEntity,
-      highlightedText,
-      projectName: "Demo Project",
-      artifacts,
-    },
-    initialMessages: welcomeMessages,
+    transport,
   });
 
   const didRestore = useRef(false);
@@ -65,17 +74,17 @@ export function AiPanel({ projectId }: AiPanelProps) {
     if (didRestore.current) return;
     didRestore.current = true;
     const stored = localChatStore.load(projectId);
-    if (stored.length > 0) {
-      setMessages(stored as Parameters<typeof setMessages>[0]);
-    }
+    const toSet = stored.length > 0 ? stored : welcomeMessages;
+    setMessages(toSet as Parameters<typeof setMessages>[0]);
   }, [projectId, setMessages]);
 
   const isStreaming = status === "streaming";
   const isLoading = status === "submitted";
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const viewport = scrollRef.current?.querySelector("[data-slot='scroll-area-viewport']") as HTMLElement | null;
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
     }
   }, [messages]);
 
@@ -100,7 +109,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
   }
 
   return (
-    <div className="flex h-full flex-col bg-muted/30 border-l border-border/40">
+    <div className="flex h-full flex-col bg-muted/30 border-l border-border/40 w-full min-w-0 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
@@ -123,8 +132,8 @@ export function AiPanel({ projectId }: AiPanelProps) {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0 px-4 py-3" ref={scrollRef}>
-        <div className="space-y-4 pb-4">
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+        <div className="space-y-4 pb-4 px-4 py-3 w-full overflow-hidden">
           {messages.map((message) => (
             <div key={message.id} className="space-y-1">
               {message.role === "user" ? (
@@ -140,7 +149,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
                       return (
                         <div
                           key={i}
-                          className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm max-w-none [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg [&_code]:text-xs"
+                          className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm max-w-none break-words overflow-hidden [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_code]:text-xs"
                         >
                           <MessageMarkdown content={part.text} />
                         </div>
@@ -233,6 +242,8 @@ const ARTIFACT_TOOL_LABELS: Record<string, string> = {
   generatePersona: "Creating persona",
   generateFeatureTree: "Building feature tree",
   generateCompetitor: "Analyzing competitor",
+  suggestPriorities: "Scoring features",
+  refineFeatureDescription: "Refining description",
 };
 
 function extractToolInfo(part: unknown): ToolInfo | null {
@@ -285,6 +296,64 @@ function renderToolPart(tool: ToolInfo, key: number) {
         icon={Globe}
         label="Researching"
         detail={query ? `"${query}"` : undefined}
+      />
+    );
+  }
+
+  if (tool.toolName === "refineFeatureDescription") {
+    if (isComplete && tool.output) {
+      const result = tool.output as {
+        refinedDescription?: {
+          featureTitle: string;
+          parentPath: string[];
+          description: string;
+        };
+      };
+      if (result.refinedDescription) {
+        return (
+          <RefinedDescriptionCard
+            key={key}
+            data={result.refinedDescription}
+          />
+        );
+      }
+    }
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={Sparkles}
+        label="Refining description"
+      />
+    );
+  }
+
+  if (tool.toolName === "suggestPriorities") {
+    if (isComplete && tool.output) {
+      const result = tool.output as {
+        priorityScores?: {
+          featureTitle: string;
+          parentPath: string[];
+          reach: number;
+          impact: number;
+          confidence: number;
+          effort: number;
+          rationale: string;
+        }[];
+      };
+      if (result.priorityScores) {
+        return (
+          <PriorityScoresCard
+            key={key}
+            scores={result.priorityScores}
+          />
+        );
+      }
+    }
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={Sparkles}
+        label="Scoring features"
       />
     );
   }
@@ -448,4 +517,230 @@ function formatInline(text: string): React.ReactNode {
       );
     return part;
   });
+}
+
+type PriorityScore = {
+  featureTitle: string;
+  parentPath: string[];
+  reach: number;
+  impact: number;
+  confidence: number;
+  effort: number;
+  rationale: string;
+};
+
+function applyScoresToTree(
+  children: FeatureNode[],
+  scores: PriorityScore[],
+  parentTitles: string[] = [],
+): FeatureNode[] {
+  return children.map((node) => {
+    const match = scores.find(
+      (s) =>
+        s.featureTitle === node.title &&
+        JSON.stringify(s.parentPath) === JSON.stringify(parentTitles),
+    );
+    const updated = match
+      ? {
+          ...node,
+          reach: match.reach,
+          impact: match.impact,
+          confidence: match.confidence,
+          effort: match.effort,
+        }
+      : node;
+    if (updated.children?.length) {
+      return {
+        ...updated,
+        children: applyScoresToTree(updated.children, scores, [
+          ...parentTitles,
+          node.title,
+        ]),
+      };
+    }
+    return updated;
+  });
+}
+
+function applyDescriptionToTree(
+  children: FeatureNode[],
+  featureTitle: string,
+  parentPath: string[],
+  description: string,
+  currentPath: string[] = [],
+  applied = { done: false },
+): FeatureNode[] {
+  return children.map((node) => {
+    const pathMatch =
+      JSON.stringify(currentPath) === JSON.stringify(parentPath);
+    const titleMatch = node.title === featureTitle;
+    const isExactMatch = titleMatch && pathMatch;
+    const updated =
+      isExactMatch && !applied.done
+        ? ((applied.done = true), { ...node, description })
+        : node;
+    if (updated.children?.length) {
+      return {
+        ...updated,
+        children: applyDescriptionToTree(
+          updated.children,
+          featureTitle,
+          parentPath,
+          description,
+          [...currentPath, node.title],
+          applied,
+        ),
+      };
+    }
+    return updated;
+  });
+}
+
+function applyDescriptionFuzzy(
+  children: FeatureNode[],
+  featureTitle: string,
+  description: string,
+): FeatureNode[] {
+  let found = false;
+  function walk(nodes: FeatureNode[]): FeatureNode[] {
+    return nodes.map((node) => {
+      if (!found && node.title === featureTitle) {
+        found = true;
+        return {
+          ...node,
+          description,
+          children: node.children ? walk(node.children) : undefined,
+        };
+      }
+      return node.children?.length
+        ? { ...node, children: walk(node.children) }
+        : node;
+    });
+  }
+  return walk(children);
+}
+
+function RefinedDescriptionCard({
+  data,
+}: {
+  data: { featureTitle: string; parentPath: string[]; description: string };
+}) {
+  const [applied, setApplied] = useState(false);
+  const trees = useFeatureTrees();
+  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const setActiveView = useWorkspaceContext((s) => s.setActiveView);
+
+  const tree = trees.length > 0 ? trees[trees.length - 1] : null;
+
+  const handleApply = () => {
+    if (!tree || applied) return;
+    const tracker = { done: false };
+    let newChildren = applyDescriptionToTree(
+      tree.children,
+      data.featureTitle,
+      data.parentPath,
+      data.description,
+      [],
+      tracker,
+    );
+    if (!tracker.done) {
+      newChildren = applyDescriptionFuzzy(
+        tree.children,
+        data.featureTitle,
+        data.description,
+      );
+    }
+    updateArtifact(tree.id, { children: newChildren });
+    setApplied(true);
+  };
+
+  const breadcrumb =
+    data.parentPath.length > 0
+      ? `${data.parentPath.join(" › ")} › `
+      : "";
+
+  return (
+    <div className="rounded-lg border border-border/50 bg-muted/40 p-3 my-1 space-y-2">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-medium truncate">
+          Description for{" "}
+          <span className="text-muted-foreground">{breadcrumb}</span>
+          {data.featureTitle}
+        </span>
+      </div>
+      <div className="max-h-[200px] overflow-auto rounded border border-border/30 bg-background/50 p-2 text-xs whitespace-pre-wrap font-mono">
+        {data.description}
+      </div>
+      <Button
+        size="sm"
+        variant={applied ? "outline" : "secondary"}
+        className="h-7 text-xs w-full justify-center"
+        onClick={() => {
+          handleApply();
+          setActiveView("features");
+        }}
+        disabled={!tree}
+      >
+        {applied ? "Applied — View Features" : "Apply Description"}
+      </Button>
+    </div>
+  );
+}
+
+function PriorityScoresCard({ scores }: { scores: PriorityScore[] }) {
+  const [applied, setApplied] = useState(false);
+  const trees = useFeatureTrees();
+  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const setActiveView = useWorkspaceContext((s) => s.setActiveView);
+
+  const tree = trees.length > 0 ? trees[trees.length - 1] : null;
+
+  const handleApply = () => {
+    if (!tree || applied) return;
+    const newChildren = applyScoresToTree(tree.children, scores);
+    updateArtifact(tree.id, { children: newChildren });
+    setApplied(true);
+  };
+
+  return (
+    <div className="rounded-lg border border-border/50 bg-muted/40 p-3 my-1 space-y-2">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-medium">
+          RICE Scores for {scores.length} feature{scores.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+      <div className="max-h-[200px] overflow-auto text-xs space-y-1.5">
+        {scores.slice(0, 8).map((s, i) => (
+          <div key={i} className="flex items-center justify-between gap-2">
+            <span className="truncate text-muted-foreground">
+              {s.parentPath.length > 0 && (
+                <span className="opacity-60">{s.parentPath.join(" › ")} › </span>
+              )}
+              <span className="text-foreground">{s.featureTitle}</span>
+            </span>
+            <span className="shrink-0 tabular-nums font-medium">
+              {((s.reach * s.impact * (s.confidence / 100)) / s.effort).toFixed(1)}
+            </span>
+          </div>
+        ))}
+        {scores.length > 8 && (
+          <div className="text-muted-foreground">+{scores.length - 8} more</div>
+        )}
+      </div>
+      <Button
+        size="sm"
+        variant={applied ? "outline" : "secondary"}
+        className="h-7 text-xs w-full justify-center"
+        onClick={() => {
+          handleApply();
+          setActiveView("priorities");
+        }}
+        disabled={!tree}
+      >
+        {applied ? "View in Priorities" : "Apply Scores to Feature Tree"}
+      </Button>
+    </div>
+  );
 }

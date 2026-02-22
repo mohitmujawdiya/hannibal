@@ -40,7 +40,7 @@ export const useArtifactStore = create<ArtifactStore>()(
       updateArtifact: (id, partial) =>
         set((s) => ({
           artifacts: s.artifacts.map((a) =>
-            a.id === id ? { ...a, ...partial } : a
+            a.id === id ? ({ ...a, ...partial } as StoredArtifact) : a
           ),
         })),
     }),
