@@ -1,15 +1,20 @@
 import type { ViewType, SelectedEntity } from "@/stores/workspace-context";
+import type { Artifact } from "@/lib/artifact-types";
+
+type StoredArtifact = Artifact & { id: string; createdAt: number };
 
 export function buildSystemPrompt({
   activeView,
   selectedEntity,
   highlightedText,
   projectName,
+  artifacts = [],
 }: {
   activeView: ViewType;
   selectedEntity?: SelectedEntity;
   highlightedText?: string | null;
   projectName?: string;
+  artifacts?: StoredArtifact[];
 }): string {
   const viewContextMap: Record<ViewType, string> = {
     overview: "The PM is on the project overview. Help them get started by understanding their problem space, or guide them to the right view.",
@@ -41,6 +46,8 @@ export function buildSystemPrompt({
     contextSection += `\n- Highlighted text: "${highlightedText}"`;
   }
 
+  const artifactSection = buildArtifactContext(artifacts);
+
   return `You are Hannibal, an AI product management co-pilot. You help product managers discover problems, plan solutions, research markets, and manage the full product lifecycle.
 
 ## Core Behaviors
@@ -53,7 +60,7 @@ export function buildSystemPrompt({
 - Adapt to the current view context — if the PM is on the roadmap, think in timelines and dependencies; if on features, think in hierarchies and decomposition.
 
 ## Tools
-- **webSearch**: Use this proactively when you need real data — market stats, competitor info, industry trends. Don't make up numbers.
+- **webSearch**: Use this proactively when you need real data — market stats, competitor info, industry trends. Don't make up numbers. After every web search, always synthesize the findings into a clear analysis for the PM — never leave search results without a follow-up response.
 - **generatePlan**: Use when asked to create an implementation plan or strategy.
 - **generatePRD**: Use when asked to create a PRD, product spec, or requirements doc.
 - **generatePersona**: Use when asked to define user personas or target users.
@@ -68,5 +75,30 @@ After using any generate tool, write a brief summary of what you generated and a
 - When citing web research, include source references.
 - Be concise but thorough. Avoid filler.
 - ALWAYS use the appropriate generate tool rather than writing structured artifacts inline as text.
-${contextSection}`;
+${artifactSection}${contextSection}`;
+}
+
+function buildArtifactContext(artifacts: StoredArtifact[]): string {
+  if (artifacts.length === 0) return "";
+
+  const summaries = artifacts.map((a) => {
+    switch (a.type) {
+      case "plan":
+        return `- [Plan] "${a.title}" — Problem: ${a.sections.problemStatement.slice(0, 100)}... | ${a.sections.targetUsers.length} user segments, ${a.sections.risks.length} risks identified`;
+      case "prd":
+        return `- [PRD] "${a.title}" — ${a.sections.userStories.length} user stories, ${a.sections.acceptanceCriteria.length} acceptance criteria`;
+      case "persona":
+        return `- [Persona] "${a.name}" — ${a.demographics} | Goals: ${a.goals.slice(0, 2).join(", ")}`;
+      case "featureTree":
+        return `- [Feature Tree] "${a.rootFeature}" — ${a.children.length} top-level features`;
+      case "competitor":
+        return `- [Competitor] "${a.name}" — ${a.positioning.slice(0, 80)}`;
+    }
+  });
+
+  return `
+## Existing Artifacts (already generated — reference these, don't recreate)
+The PM has ${artifacts.length} artifact(s) in their workspace:
+${summaries.join("\n")}
+`;
 }

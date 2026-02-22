@@ -1,20 +1,18 @@
-import { defineTool } from "@/lib/schema";
+import { tool, jsonSchema } from "ai";
 
-type PlanParams = {
-  title: string;
-  problemStatement: string;
-  targetUsers: string[];
-  proposedSolution: string;
-  technicalApproach: string;
-  successMetrics: string[];
-  risks: string[];
-  timeline: string;
-};
-
-const planTool = defineTool<PlanParams, unknown>({
+const planTool = tool({
   description:
     "Generate an implementation plan. Use when the PM asks to create a plan, strategy, or outline for solving a problem.",
-  schema: {
+  inputSchema: jsonSchema<{
+    title: string;
+    problemStatement: string;
+    targetUsers: string[];
+    proposedSolution: string;
+    technicalApproach: string;
+    successMetrics: string[];
+    risks: string[];
+    timeline: string;
+  }>({
     type: "object",
     properties: {
       title: { type: "string", description: "Plan title" },
@@ -27,7 +25,7 @@ const planTool = defineTool<PlanParams, unknown>({
       timeline: { type: "string", description: "Estimated timeline overview" },
     },
     required: ["title", "problemStatement", "targetUsers", "proposedSolution", "technicalApproach", "successMetrics", "risks", "timeline"],
-  },
+  }),
   execute: async (params) => ({
     artifact: {
       type: "plan" as const,
@@ -46,21 +44,19 @@ const planTool = defineTool<PlanParams, unknown>({
   }),
 });
 
-type PrdParams = {
-  title: string;
-  overview: string;
-  userStories: string[];
-  acceptanceCriteria: string[];
-  technicalConstraints: string[];
-  outOfScope: string[];
-  successMetrics: string[];
-  dependencies: string[];
-};
-
-const prdTool = defineTool<PrdParams, unknown>({
+const prdTool = tool({
   description:
     "Generate a Product Requirements Document. Use when the PM asks for a PRD, product spec, or requirements.",
-  schema: {
+  inputSchema: jsonSchema<{
+    title: string;
+    overview: string;
+    userStories: string[];
+    acceptanceCriteria: string[];
+    technicalConstraints: string[];
+    outOfScope: string[];
+    successMetrics: string[];
+    dependencies: string[];
+  }>({
     type: "object",
     properties: {
       title: { type: "string", description: "PRD title" },
@@ -73,7 +69,7 @@ const prdTool = defineTool<PrdParams, unknown>({
       dependencies: { type: "array", items: { type: "string" }, description: "Dependencies" },
     },
     required: ["title", "overview", "userStories", "acceptanceCriteria", "technicalConstraints", "outOfScope", "successMetrics", "dependencies"],
-  },
+  }),
   execute: async (params) => ({
     artifact: {
       type: "prd" as const,
@@ -92,20 +88,18 @@ const prdTool = defineTool<PrdParams, unknown>({
   }),
 });
 
-type PersonaParams = {
-  name: string;
-  demographics: string;
-  goals: string[];
-  frustrations: string[];
-  behaviors: string[];
-  techProficiency: string;
-  quote: string;
-};
-
-const personaTool = defineTool<PersonaParams, unknown>({
+const personaTool = tool({
   description:
     "Generate a user persona. Use when the PM asks to define target users or user personas.",
-  schema: {
+  inputSchema: jsonSchema<{
+    name: string;
+    demographics: string;
+    goals: string[];
+    frustrations: string[];
+    behaviors: string[];
+    techProficiency: string;
+    quote: string;
+  }>({
     type: "object",
     properties: {
       name: { type: "string", description: "Persona name" },
@@ -117,22 +111,20 @@ const personaTool = defineTool<PersonaParams, unknown>({
       quote: { type: "string", description: "A representative quote" },
     },
     required: ["name", "demographics", "goals", "frustrations", "behaviors", "techProficiency", "quote"],
-  },
+  }),
   execute: async (params) => ({
     artifact: { type: "persona" as const, ...params },
     status: "generated",
   }),
 });
 
-type FeatureTreeParams = {
-  rootFeature: string;
-  children: { title: string; description?: string; children?: { title: string; description?: string }[] }[];
-};
-
-const featureTreeTool = defineTool<FeatureTreeParams, unknown>({
+const featureTreeTool = tool({
   description:
     "Generate a feature tree / hierarchy. Use when the PM asks to map out features or decompose a product.",
-  schema: {
+  inputSchema: jsonSchema<{
+    rootFeature: string;
+    children: { title: string; description?: string; children?: { title: string; description?: string }[] }[];
+  }>({
     type: "object",
     properties: {
       rootFeature: { type: "string", description: "Root product name" },
@@ -161,27 +153,25 @@ const featureTreeTool = defineTool<FeatureTreeParams, unknown>({
       },
     },
     required: ["rootFeature", "children"],
-  },
+  }),
   execute: async (params) => ({
     artifact: { type: "featureTree" as const, ...params },
     status: "generated",
   }),
 });
 
-type CompetitorParams = {
-  name: string;
-  url?: string;
-  positioning: string;
-  strengths: string[];
-  weaknesses: string[];
-  pricing?: string;
-  featureGaps: string[];
-};
-
-const competitorTool = defineTool<CompetitorParams, unknown>({
+const competitorTool = tool({
   description:
     "Generate a competitor analysis. Use when the PM asks to analyze competitors or the competitive landscape.",
-  schema: {
+  inputSchema: jsonSchema<{
+    name: string;
+    url?: string;
+    positioning: string;
+    strengths: string[];
+    weaknesses: string[];
+    pricing?: string;
+    featureGaps: string[];
+  }>({
     type: "object",
     properties: {
       name: { type: "string", description: "Competitor name" },
@@ -193,7 +183,7 @@ const competitorTool = defineTool<CompetitorParams, unknown>({
       featureGaps: { type: "array", items: { type: "string" }, description: "Feature gaps (opportunities)" },
     },
     required: ["name", "positioning", "strengths", "weaknesses", "featureGaps"],
-  },
+  }),
   execute: async (params) => ({
     artifact: { type: "competitor" as const, ...params },
     status: "generated",

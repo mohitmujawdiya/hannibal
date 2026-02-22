@@ -1,15 +1,15 @@
-import { defineTool } from "@/lib/schema";
+import { tool, jsonSchema } from "ai";
 
-export const webSearchTool = defineTool<{ query: string }, unknown>({
+export const webSearchTool = tool({
   description:
     "Search the web for current information about markets, competitors, products, trends, statistics, or any topic relevant to product management. Use this when you need real-time data to ground your advice.",
-  schema: {
+  inputSchema: jsonSchema<{ query: string }>({
     type: "object",
     properties: {
       query: { type: "string", description: "The search query" },
     },
     required: ["query"],
-  },
+  }),
   execute: async ({ query }) => {
     const apiKey = process.env.TAVILY_API_KEY;
 

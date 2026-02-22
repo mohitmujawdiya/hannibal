@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Artifact } from "@/lib/artifact-types";
 import { useWorkspaceContext, type ViewType } from "@/stores/workspace-context";
+import { useArtifactStore } from "@/stores/artifact-store";
 
 const artifactMeta: Record<
   Artifact["type"],
@@ -31,7 +32,9 @@ const artifactMeta: Record<
 
 export function ArtifactCard({ artifact }: { artifact: Artifact }) {
   const [expanded, setExpanded] = useState(false);
+  const [pushed, setPushed] = useState(false);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
+  const addArtifact = useArtifactStore((s) => s.addArtifact);
   const meta = artifactMeta[artifact.type];
   const Icon = meta.icon;
 
@@ -68,15 +71,23 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
       {expanded && (
         <div className="px-3 pb-3">
           <ArtifactPreview artifact={artifact} />
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2">
             <Button
               size="sm"
-              variant="secondary"
-              className="h-7 text-xs"
-              onClick={() => setActiveView(meta.view)}
+              variant={pushed ? "outline" : "secondary"}
+              className="h-7 text-xs w-full justify-center"
+              onClick={() => {
+                if (!pushed) {
+                  addArtifact(artifact);
+                  setPushed(true);
+                }
+                setActiveView(meta.view);
+              }}
             >
-              <ExternalLink className="h-3 w-3 mr-1" />
-              Open in {meta.label}
+              <ExternalLink className="h-3 w-3 shrink-0" />
+              <span className="truncate">
+                {pushed ? `View in ${meta.label}` : `Push to ${meta.label}`}
+              </span>
             </Button>
           </div>
         </div>

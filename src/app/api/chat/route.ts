@@ -1,6 +1,7 @@
 import { openai } from "@ai-sdk/openai";
 import {
   streamText,
+  stepCountIs,
   convertToModelMessages,
   type UIMessage,
 } from "ai";
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
     selectedEntity = null,
     highlightedText = null,
     projectName,
+    artifacts = [],
   } = body;
 
   const systemPrompt = buildSystemPrompt({
@@ -25,6 +27,7 @@ export async function POST(req: Request) {
     selectedEntity,
     highlightedText,
     projectName,
+    artifacts,
   });
 
   const modelMessages = await convertToModelMessages(
@@ -39,7 +42,7 @@ export async function POST(req: Request) {
       webSearch: webSearchTool,
       ...artifactTools,
     },
-    maxSteps: 5,
+    stopWhen: stepCountIs(5),
     temperature: 0.7,
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import {
   PanelRightClose,
@@ -14,11 +14,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
+import { useArtifactStore } from "@/stores/artifact-store";
 import { ArtifactCard } from "@/components/ai/artifact-card";
+import { localChatStore } from "@/lib/chat-persistence";
 import type { Artifact } from "@/lib/artifact-types";
 
 type AiPanelProps = {
@@ -32,28 +33,42 @@ export function AiPanel({ projectId }: AiPanelProps) {
   const selectedEntity = useWorkspaceContext((s) => s.selectedEntity);
   const highlightedText = useWorkspaceContext((s) => s.highlightedText);
   const toggleAiPanel = useWorkspaceContext((s) => s.toggleAiPanel);
+  const artifacts = useArtifactStore((s) => s.artifacts);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
 
-  const { messages, sendMessage, status, stop } = useChat({
+  const welcomeMessages = useMemo(() => [
+    {
+      id: "welcome",
+      role: "assistant" as const,
+      content: WELCOME_MESSAGE,
+      parts: [{ type: "text" as const, text: WELCOME_MESSAGE }],
+    },
+  ], []);
+
+  const { messages, setMessages, sendMessage, status, stop } = useChat({
     api: "/api/chat",
     body: {
       activeView,
       selectedEntity,
       highlightedText,
       projectName: "Demo Project",
+      artifacts,
     },
-    initialMessages: [
-      {
-        id: "welcome",
-        role: "assistant",
-        content: WELCOME_MESSAGE,
-        parts: [{ type: "text", text: WELCOME_MESSAGE }],
-      },
-    ],
+    initialMessages: welcomeMessages,
   });
+
+  const didRestore = useRef(false);
+  useEffect(() => {
+    if (didRestore.current) return;
+    didRestore.current = true;
+    const stored = localChatStore.load(projectId);
+    if (stored.length > 0) {
+      setMessages(stored as Parameters<typeof setMessages>[0]);
+    }
+  }, [projectId, setMessages]);
 
   const isStreaming = status === "streaming";
   const isLoading = status === "submitted";
@@ -63,6 +78,12 @@ export function AiPanel({ projectId }: AiPanelProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (status === "ready" && messages.length > 1) {
+      localChatStore.save(projectId, messages as Parameters<typeof localChatStore.save>[1]);
+    }
+  }, [status, messages, projectId]);
 
   const submit = useCallback(() => {
     const text = input.trim();
@@ -85,9 +106,6 @@ export function AiPanel({ projectId }: AiPanelProps) {
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">Hannibal AI</span>
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-            {activeView}
-          </Badge>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -105,7 +123,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4 py-3" ref={scrollRef}>
+      <ScrollArea className="flex-1 min-h-0 px-4 py-3" ref={scrollRef}>
         <div className="space-y-4 pb-4">
           {messages.map((message) => (
             <div key={message.id} className="space-y-1">
@@ -128,50 +146,9 @@ export function AiPanel({ projectId }: AiPanelProps) {
                         </div>
                       );
                     }
-                    if (part.type === "tool-invocation") {
-                      const toolName = part.toolInvocation.toolName;
-                      const state = part.toolInvocation.state;
-                      if (toolName === "webSearch") {
-                        return (
-                          <div
-                            key={i}
-                            className="flex items-center gap-1.5 text-xs text-muted-foreground py-1"
-                          >
-                            <Globe
-                              className={cn(
-                                "h-3 w-3",
-                                state !== "result" && "animate-pulse"
-                              )}
-                            />
-                            {state === "result"
-                              ? `Searched: "${part.toolInvocation.args?.query}"`
-                              : `Researching: "${part.toolInvocation.args?.query}"...`}
-                          </div>
-                        );
-                      }
-                      const artifactToolNames = [
-                        "generatePlan",
-                        "generatePRD",
-                        "generatePersona",
-                        "generateFeatureTree",
-                        "generateCompetitor",
-                      ];
-                      if (
-                        artifactToolNames.includes(toolName) &&
-                        state === "result"
-                      ) {
-                        const result = part.toolInvocation.result as
-                          | { artifact: Artifact }
-                          | undefined;
-                        if (result?.artifact) {
-                          return (
-                            <div key={i} className="py-1">
-                              <ArtifactCard artifact={result.artifact} />
-                            </div>
-                          );
-                        }
-                      }
-                      return null;
+                    const tool = extractToolInfo(part);
+                    if (tool) {
+                      return renderToolPart(tool, i);
                     }
                     return null;
                   })}
@@ -238,6 +215,130 @@ export function AiPanel({ projectId }: AiPanelProps) {
             )}
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+type ToolInfo = {
+  toolName: string;
+  state: string;
+  input: Record<string, unknown> | undefined;
+  output: Record<string, unknown> | undefined;
+};
+
+const ARTIFACT_TOOL_LABELS: Record<string, string> = {
+  generatePlan: "Generating plan",
+  generatePRD: "Generating PRD",
+  generatePersona: "Creating persona",
+  generateFeatureTree: "Building feature tree",
+  generateCompetitor: "Analyzing competitor",
+};
+
+function extractToolInfo(part: unknown): ToolInfo | null {
+  const p = part as Record<string, unknown>;
+  const type = p.type as string;
+  if (!type) return null;
+
+  // AI SDK v6 static tools: type = "tool-{name}"
+  if (type.startsWith("tool-")) {
+    return {
+      toolName: type.slice(5),
+      state: (p.state as string) ?? "call",
+      input: p.input as Record<string, unknown> | undefined,
+      output: p.output as Record<string, unknown> | undefined,
+    };
+  }
+
+  // AI SDK v6 dynamic tools (client doesn't define tool schemas)
+  if (type === "dynamic-tool") {
+    return {
+      toolName: (p.toolName as string) ?? "",
+      state: (p.state as string) ?? "call",
+      input: p.input as Record<string, unknown> | undefined,
+      output: p.output as Record<string, unknown> | undefined,
+    };
+  }
+
+  return null;
+}
+
+function renderToolPart(tool: ToolInfo, key: number) {
+  const isComplete = tool.state === "output-available";
+
+  if (tool.toolName === "webSearch") {
+    const query = (tool.input?.query as string) ?? "";
+    if (isComplete) {
+      return (
+        <div
+          key={key}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground py-1"
+        >
+          <Globe className="h-3 w-3" />
+          Searched: &ldquo;{query}&rdquo;
+        </div>
+      );
+    }
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={Globe}
+        label="Researching"
+        detail={query ? `"${query}"` : undefined}
+      />
+    );
+  }
+
+  if (tool.toolName in ARTIFACT_TOOL_LABELS) {
+    if (isComplete && tool.output) {
+      const result = tool.output as { artifact?: Artifact };
+      if (result.artifact) {
+        return (
+          <div key={key} className="py-1">
+            <ArtifactCard artifact={result.artifact} />
+          </div>
+        );
+      }
+    }
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={Sparkles}
+        label={ARTIFACT_TOOL_LABELS[tool.toolName]}
+      />
+    );
+  }
+
+  return null;
+}
+
+function ToolProgressCard({
+  icon: Icon,
+  label,
+  detail,
+}: {
+  icon: React.ElementType;
+  label: string;
+  detail?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/40 px-3 py-2.5 my-1">
+      <div className="relative flex items-center justify-center">
+        <span className="absolute h-6 w-6 rounded-full bg-primary/10 animate-ping" />
+        <Icon className="h-4 w-4 text-primary relative z-10" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs font-medium flex items-center gap-1.5">
+          {label}
+          <span className="inline-flex gap-0.5">
+            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
+            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
+            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+          </span>
+        </div>
+        {detail && (
+          <p className="text-[11px] text-muted-foreground truncate">{detail}</p>
+        )}
       </div>
     </div>
   );
