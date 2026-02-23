@@ -441,6 +441,12 @@ function MessageMarkdown({ content }: { content: string }) {
         return part.split("\n").map((line, j) => {
           const key = `${i}-${j}`;
 
+          if (line.startsWith("#### "))
+            return (
+              <h4 key={key} className="font-semibold text-xs mt-2 mb-1">
+                {formatInline(line.slice(5))}
+              </h4>
+            );
           if (line.startsWith("### "))
             return (
               <h3 key={key} className="font-semibold mt-3 mb-1">
