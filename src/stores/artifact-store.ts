@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
+import { toast } from "sonner";
 import type {
   Artifact,
   PlanArtifact,
@@ -9,13 +10,14 @@ import type {
   FeatureTreeArtifact,
   CompetitorArtifact,
 } from "@/lib/artifact-types";
-import { personaToMarkdown, competitorToMarkdown } from "@/lib/artifact-to-markdown";
+import { personaToMarkdown, competitorToMarkdown, featureTreeToContentMarkdown } from "@/lib/artifact-to-markdown";
 
 type StoredArtifact = Artifact & { id: string; createdAt: number };
 
 type ArtifactStore = {
   artifacts: StoredArtifact[];
   addArtifact: (artifact: Artifact) => string;
+  addArtifactRaw: (artifact: StoredArtifact) => void;
   removeArtifact: (id: string) => void;
   updateArtifact: (id: string, artifact: Partial<Artifact>) => void;
 };
@@ -35,6 +37,9 @@ export const useArtifactStore = create<ArtifactStore>()(
         return id;
       },
 
+      addArtifactRaw: (artifact) =>
+        set((s) => ({ artifacts: [...s.artifacts, artifact] })),
+
       removeArtifact: (id) =>
         set((s) => ({ artifacts: s.artifacts.filter((a) => a.id !== id) })),
 
@@ -47,7 +52,7 @@ export const useArtifactStore = create<ArtifactStore>()(
     }),
     {
       name: "hannibal:artifacts",
-      version: 2,
+      version: 3,
       partialize: (state) => ({ artifacts: state.artifacts }),
       migrate: (persisted, version) => {
         const state = persisted as { artifacts: StoredArtifact[] };
@@ -67,6 +72,18 @@ export const useArtifactStore = create<ArtifactStore>()(
                 ...a,
                 title: legacy.name ?? legacy.title ?? "Competitor",
                 content: competitorToMarkdown(legacy),
+              } as StoredArtifact;
+            }
+            return a;
+          });
+        }
+        if (version < 3) {
+          state.artifacts = state.artifacts.map((a) => {
+            if (a.type === "featureTree" && !a.content) {
+              const tree = a as StoredArtifact & FeatureTreeArtifact;
+              return {
+                ...a,
+                content: featureTreeToContentMarkdown(tree.rootFeature, tree.children),
               } as StoredArtifact;
             }
             return a;
@@ -126,3 +143,27 @@ export const useCompetitors = () =>
       )
     )
   );
+
+function getArtifactLabel(a: StoredArtifact): string {
+  if (a.type === "featureTree") return a.rootFeature;
+  return a.title || "Untitled";
+}
+
+export function softDeleteArtifact(id: string) {
+  const store = useArtifactStore.getState();
+  const artifact = store.artifacts.find((a) => a.id === id);
+  if (!artifact) return;
+
+  store.removeArtifact(id);
+
+  toast("Artifact deleted", {
+    description: getArtifactLabel(artifact),
+    action: {
+      label: "Undo",
+      onClick: () => {
+        useArtifactStore.getState().addArtifactRaw(artifact);
+      },
+    },
+    duration: 5000,
+  });
+}

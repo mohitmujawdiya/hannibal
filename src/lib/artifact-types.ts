@@ -65,6 +65,8 @@ export type FeatureTreeArtifact = {
   type: "featureTree";
   rootFeature: string;
   children: FeatureNode[];
+  /** Markdown representation of the tree. Auto-synced from children. */
+  content?: string;
 };
 
 export type FeatureNode = {

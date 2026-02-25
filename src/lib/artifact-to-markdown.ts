@@ -123,20 +123,46 @@ export function competitorToMarkdown(competitor: CompetitorArtifact): string {
 }
 
 export function featureTreeToMarkdown(tree: FeatureTreeArtifact): string {
-  const lines: string[] = [`- **${tree.rootFeature}**`];
-  for (const node of tree.children) {
-    appendNode(lines, node, 1);
+  if (tree.content != null && tree.content.trim()) {
+    return tree.content;
+  }
+  return featureTreeToContentMarkdown(tree.rootFeature, tree.children);
+}
+
+/** Generate markdown from the tree structure, including RICE scores and descriptions. */
+export function featureTreeToContentMarkdown(
+  rootFeature: string,
+  children: FeatureNode[],
+): string {
+  const lines: string[] = [`# ${rootFeature}`, ""];
+  for (const node of children) {
+    appendContentNode(lines, node, 0);
   }
   return lines.join("\n");
 }
 
-function appendNode(lines: string[], node: FeatureNode, indent: number): void {
-  const prefix = "  ".repeat(indent) + "- ";
-  const desc = node.description ? ` — ${node.description}` : "";
-  lines.push(`${prefix}${node.title}${desc}`);
+function formatRiceTag(node: FeatureNode): string {
+  const parts: string[] = [];
+  if (node.reach != null) parts.push(`R:${node.reach}`);
+  if (node.impact != null) parts.push(`I:${node.impact}`);
+  if (node.confidence != null) parts.push(`C:${node.confidence}%`);
+  if (node.effort != null) parts.push(`E:${node.effort}w`);
+  return parts.length > 0 ? ` [${parts.join(" ")}]` : "";
+}
+
+function appendContentNode(lines: string[], node: FeatureNode, depth: number): void {
+  const indent = "  ".repeat(depth);
+  const rice = formatRiceTag(node);
+  lines.push(`${indent}- ${node.title}${rice}`);
+  if (node.description) {
+    const descIndent = indent + "  ";
+    for (const line of node.description.split("\n")) {
+      lines.push(`${descIndent}${line}`);
+    }
+  }
   if (node.children?.length) {
     for (const child of node.children) {
-      appendNode(lines, child, indent + 1);
+      appendContentNode(lines, child, depth + 1);
     }
   }
 }

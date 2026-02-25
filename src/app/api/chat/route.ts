@@ -20,7 +20,11 @@ export async function POST(req: Request) {
     highlightedText = null,
     projectName,
     artifacts = [],
+    model: requestedModel,
   } = body;
+
+  const ALLOWED_MODELS = ["gpt-4o", "gpt-4o-mini", "o3-mini"];
+  const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "gpt-4o";
 
   const systemPrompt = buildSystemPrompt({
     activeView,
@@ -35,7 +39,7 @@ export async function POST(req: Request) {
   );
 
   const result = streamText({
-    model: openai("gpt-4o"),
+    model: openai(model),
     system: systemPrompt,
     messages: modelMessages,
     tools: {

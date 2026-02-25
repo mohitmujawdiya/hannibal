@@ -60,7 +60,7 @@ const personaTool = tool({
       content: {
         type: "string",
         description:
-          "Full persona as markdown. Use this exact format:\n## Name\n**Demographics:** age, occupation, location\n**Tech Proficiency:** level\n> \"A representative quote\"\n\n**Goals:**\n- goal1\n- goal2\n\n**Frustrations:**\n- frustration1\n\n**Behaviors:**\n- behavior1",
+          "Full persona as markdown. IMPORTANT: The ## heading MUST be the persona's actual name (same as title), NOT the literal word 'Name'. Use this format:\n## {persona's actual name}\n**Demographics:** age, occupation, location\n**Tech Proficiency:** level\n> \"A representative quote\"\n\n**Goals:**\n- goal1\n- goal2\n\n**Frustrations:**\n- frustration1\n\n**Behaviors:**\n- behavior1",
       },
     },
     required: ["title", "content"],
