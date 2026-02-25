@@ -73,8 +73,13 @@ function structuredPrdToMarkdown(title: string, sections: PrdSections): string {
 }
 
 export function personaToMarkdown(persona: PersonaArtifact): string {
+  if (persona.content != null && persona.content.trim()) {
+    return persona.content;
+  }
+  // Legacy structured data — serialize to markdown
+  const name = persona.name ?? persona.title ?? "Persona";
   const parts: string[] = [
-    `## ${persona.name}`,
+    `## ${name}`,
     `**Demographics:** ${persona.demographics || ""}`,
     `**Tech Proficiency:** ${persona.techProficiency || ""}`,
     persona.quote ? `> ${persona.quote}` : "",
@@ -93,8 +98,13 @@ export function personaToMarkdown(persona: PersonaArtifact): string {
 }
 
 export function competitorToMarkdown(competitor: CompetitorArtifact): string {
+  if (competitor.content != null && competitor.content.trim()) {
+    return competitor.content;
+  }
+  // Legacy structured data — serialize to markdown
+  const name = competitor.name ?? competitor.title ?? "Competitor";
   const parts: string[] = [
-    `## ${competitor.name}`,
+    `## ${name}`,
     competitor.url ? `**URL:** ${competitor.url}` : "",
     `**Positioning:** ${competitor.positioning || ""}`,
     competitor.pricing ? `**Pricing:** ${competitor.pricing}` : "",

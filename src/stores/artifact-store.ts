@@ -9,6 +9,7 @@ import type {
   FeatureTreeArtifact,
   CompetitorArtifact,
 } from "@/lib/artifact-types";
+import { personaToMarkdown, competitorToMarkdown } from "@/lib/artifact-to-markdown";
 
 type StoredArtifact = Artifact & { id: string; createdAt: number };
 
@@ -46,7 +47,33 @@ export const useArtifactStore = create<ArtifactStore>()(
     }),
     {
       name: "hannibal:artifacts",
+      version: 2,
       partialize: (state) => ({ artifacts: state.artifacts }),
+      migrate: (persisted, version) => {
+        const state = persisted as { artifacts: StoredArtifact[] };
+        if (version < 2) {
+          state.artifacts = state.artifacts.map((a) => {
+            if (a.type === "persona" && !a.content) {
+              const legacy = a as StoredArtifact & PersonaArtifact;
+              return {
+                ...a,
+                title: legacy.name ?? legacy.title ?? "Persona",
+                content: personaToMarkdown(legacy),
+              } as StoredArtifact;
+            }
+            if (a.type === "competitor" && !a.content) {
+              const legacy = a as StoredArtifact & CompetitorArtifact;
+              return {
+                ...a,
+                title: legacy.name ?? legacy.title ?? "Competitor",
+                content: competitorToMarkdown(legacy),
+              } as StoredArtifact;
+            }
+            return a;
+          });
+        }
+        return state;
+      },
     },
   ),
 );

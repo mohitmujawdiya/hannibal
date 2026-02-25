@@ -42,13 +42,23 @@ export type PrdArtifact = {
 
 export type PersonaArtifact = {
   type: "persona";
-  name: string;
-  demographics: string;
-  goals: string[];
-  frustrations: string[];
-  behaviors: string[];
-  techProficiency: string;
-  quote: string;
+  title: string;
+  /** Markdown content. Legacy artifacts may have structured fields instead. */
+  content?: string;
+  /** @deprecated Migrated to title. Present only in legacy persisted artifacts. */
+  name?: string;
+  /** @deprecated Migrated to content. */
+  demographics?: string;
+  /** @deprecated Migrated to content. */
+  goals?: string[];
+  /** @deprecated Migrated to content. */
+  frustrations?: string[];
+  /** @deprecated Migrated to content. */
+  behaviors?: string[];
+  /** @deprecated Migrated to content. */
+  techProficiency?: string;
+  /** @deprecated Migrated to content. */
+  quote?: string;
 };
 
 export type FeatureTreeArtifact = {
@@ -69,13 +79,23 @@ export type FeatureNode = {
 
 export type CompetitorArtifact = {
   type: "competitor";
-  name: string;
+  title: string;
+  /** Markdown content. Legacy artifacts may have structured fields instead. */
+  content?: string;
+  /** @deprecated Migrated to title. Present only in legacy persisted artifacts. */
+  name?: string;
+  /** @deprecated Migrated to content. */
   url?: string;
-  positioning: string;
-  strengths: string[];
-  weaknesses: string[];
+  /** @deprecated Migrated to content. */
+  positioning?: string;
+  /** @deprecated Migrated to content. */
+  strengths?: string[];
+  /** @deprecated Migrated to content. */
+  weaknesses?: string[];
+  /** @deprecated Migrated to content. */
   pricing?: string;
-  featureGaps: string[];
+  /** @deprecated Migrated to content. */
+  featureGaps?: string[];
 };
 
 export type Artifact =

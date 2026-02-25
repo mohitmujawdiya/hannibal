@@ -63,9 +63,9 @@ export function buildSystemPrompt({
 - **webSearch**: Use this proactively when you need real data — market stats, competitor info, industry trends. Don't make up numbers. After every web search, always synthesize the findings into a clear analysis for the PM — never leave search results without a follow-up response.
 - **generatePlan**: Use when asked to create an implementation plan or strategy. Output markdown with ## headings (Problem Statement, Target Users, Proposed Solution, Technical Approach, Success Metrics, Risks, Timeline).
 - **generatePRD**: Use when asked to create a PRD, product spec, or requirements doc. Output markdown with ## headings (Overview, User Stories, Acceptance Criteria, Technical Constraints, Out of Scope, Success Metrics, Dependencies).
-- **generatePersona**: Use when asked to define user personas or target users.
+- **generatePersona**: Use when asked to define user personas or target users. Output markdown with ## Name heading, **Demographics:**, **Tech Proficiency:**, > quote, **Goals:** (- bullets), **Frustrations:** (- bullets), **Behaviors:** (- bullets).
 - **generateFeatureTree**: Use when asked to map features, decompose a product, or create a feature hierarchy. ALWAYS include a description for every feature node. Adapt the description to the feature's role: strategic summary for group/parent features, acceptance criteria and edge cases for leaf features, technical constraints for infrastructure features. Descriptions support markdown.
-- **generateCompetitor**: Use when asked to analyze a specific competitor.
+- **generateCompetitor**: Use when asked to analyze a specific competitor. Output markdown with ## Name heading, **URL:**, **Positioning:**, **Pricing:**, **Strengths:** (- bullets), **Weaknesses:** (- bullets), **Feature Gaps:** (- bullets).
 - **refineFeatureDescription**: Use when the PM asks to improve, rewrite, or add detail to a specific feature's description. Match the feature by title and parent path. Adapt the description to the feature's role — acceptance criteria for user-facing leaves, technical constraints for infra, strategic summary for groups. Use markdown formatting.
 - **suggestPriorities**: Use when asked to score, prioritize, or rank features. Only score **leaf features** (features with no children) — parent/group features derive their priority from their children. Provide RICE scores (Reach 1-10, Impact 0.25/0.5/1/2/3, Confidence 50/80/100, Effort in person-weeks minimum 0.5) for each leaf. Include a brief rationale for each score.
 
@@ -114,18 +114,24 @@ function buildArtifactContext(artifacts: StoredArtifact[]): string {
         sections.push(`### [PRD] "${a.title}"\n${truncated}`);
         break;
       }
-      case "persona":
-        sections.push(`### [Persona] "${a.name}"\n- Demographics: ${a.demographics}\n- Goals: ${a.goals.join(", ")}\n- Frustrations: ${a.frustrations.join(", ")}\n- Behaviors: ${a.behaviors.join(", ")}\n- Tech: ${a.techProficiency}\n- Quote: "${a.quote}"`);
+      case "persona": {
+        const pContent = a.content || "";
+        const pTruncated = pContent.length > MAX_CONTENT ? pContent.slice(0, MAX_CONTENT) + "\n...(truncated)" : pContent;
+        sections.push(`### [Persona] "${a.title}"\n${pTruncated}`);
         break;
+      }
       case "featureTree": {
         const tree = a.children.map(c => serializeFeatureNode(c)).join("\n");
         const truncated = tree.length > MAX_CONTENT ? tree.slice(0, MAX_CONTENT) + "\n...(truncated)" : tree;
         sections.push(`### [Feature Tree] "${a.rootFeature}"\n${truncated}`);
         break;
       }
-      case "competitor":
-        sections.push(`### [Competitor] "${a.name}"${a.url ? ` (${a.url})` : ""}\n- Positioning: ${a.positioning}\n- Strengths: ${a.strengths.join(", ")}\n- Weaknesses: ${a.weaknesses.join(", ")}\n- Feature gaps: ${a.featureGaps.join(", ")}${a.pricing ? `\n- Pricing: ${a.pricing}` : ""}`);
+      case "competitor": {
+        const cContent = a.content || "";
+        const cTruncated = cContent.length > MAX_CONTENT ? cContent.slice(0, MAX_CONTENT) + "\n...(truncated)" : cContent;
+        sections.push(`### [Competitor] "${a.title}"\n${cTruncated}`);
         break;
+      }
     }
   }
 

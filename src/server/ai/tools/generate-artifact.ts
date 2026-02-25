@@ -52,30 +52,25 @@ const prdTool = tool({
 
 const personaTool = tool({
   description:
-    "Generate a user persona. Use when the PM asks to define target users or user personas.",
-  inputSchema: jsonSchema<{
-    name: string;
-    demographics: string;
-    goals: string[];
-    frustrations: string[];
-    behaviors: string[];
-    techProficiency: string;
-    quote: string;
-  }>({
+    "Generate a user persona. Use when the PM asks to define target users or user personas. Output structured markdown.",
+  inputSchema: jsonSchema<{ title: string; content: string }>({
     type: "object",
     properties: {
-      name: { type: "string", description: "Persona name" },
-      demographics: { type: "string", description: "Age, occupation, location" },
-      goals: { type: "array", items: { type: "string" }, description: "Goals" },
-      frustrations: { type: "array", items: { type: "string" }, description: "Pain points" },
-      behaviors: { type: "array", items: { type: "string" }, description: "Behavioral patterns" },
-      techProficiency: { type: "string", description: "Technical skill level" },
-      quote: { type: "string", description: "A representative quote" },
+      title: { type: "string", description: "Persona name" },
+      content: {
+        type: "string",
+        description:
+          "Full persona as markdown. Use this exact format:\n## Name\n**Demographics:** age, occupation, location\n**Tech Proficiency:** level\n> \"A representative quote\"\n\n**Goals:**\n- goal1\n- goal2\n\n**Frustrations:**\n- frustration1\n\n**Behaviors:**\n- behavior1",
+      },
     },
-    required: ["name", "demographics", "goals", "frustrations", "behaviors", "techProficiency", "quote"],
+    required: ["title", "content"],
   }),
   execute: async (params) => ({
-    artifact: { type: "persona" as const, ...params },
+    artifact: {
+      type: "persona" as const,
+      title: params.title,
+      content: params.content,
+    },
     status: "generated",
   }),
 });
@@ -149,30 +144,25 @@ const featureTreeTool = tool({
 
 const competitorTool = tool({
   description:
-    "Generate a competitor analysis. Use when the PM asks to analyze competitors or the competitive landscape.",
-  inputSchema: jsonSchema<{
-    name: string;
-    url?: string;
-    positioning: string;
-    strengths: string[];
-    weaknesses: string[];
-    pricing?: string;
-    featureGaps: string[];
-  }>({
+    "Generate a competitor analysis. Use when the PM asks to analyze competitors or the competitive landscape. Output structured markdown.",
+  inputSchema: jsonSchema<{ title: string; content: string }>({
     type: "object",
     properties: {
-      name: { type: "string", description: "Competitor name" },
-      url: { type: "string", description: "Website URL" },
-      positioning: { type: "string", description: "Market positioning" },
-      strengths: { type: "array", items: { type: "string" }, description: "Key strengths" },
-      weaknesses: { type: "array", items: { type: "string" }, description: "Key weaknesses" },
-      pricing: { type: "string", description: "Pricing model" },
-      featureGaps: { type: "array", items: { type: "string" }, description: "Feature gaps (opportunities)" },
+      title: { type: "string", description: "Competitor name" },
+      content: {
+        type: "string",
+        description:
+          "Full competitor analysis as markdown. Use this exact format:\n## Name\n**URL:** https://example.com\n**Positioning:** market positioning\n**Pricing:** pricing model\n\n**Strengths:**\n- strength1\n\n**Weaknesses:**\n- weakness1\n\n**Feature Gaps:**\n- gap1",
+      },
     },
-    required: ["name", "positioning", "strengths", "weaknesses", "featureGaps"],
+    required: ["title", "content"],
   }),
   execute: async (params) => ({
-    artifact: { type: "competitor" as const, ...params },
+    artifact: {
+      type: "competitor" as const,
+      title: params.title,
+      content: params.content,
+    },
     status: "generated",
   }),
 });

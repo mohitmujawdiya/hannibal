@@ -41,7 +41,7 @@ export function FeatureFlowNode({
   };
 
   const handleBlur = (e: React.FocusEvent) => {
-    if (formRef.current?.contains(e.relatedTarget as Node)) return;
+    if (formRef.current?.contains(e.relatedTarget as globalThis.Node)) return;
     handleSave();
   };
 

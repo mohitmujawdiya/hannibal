@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import type { Artifact } from "@/lib/artifact-types";
 import { useWorkspaceContext, type ViewType } from "@/stores/workspace-context";
 import { useArtifactStore } from "@/stores/artifact-store";
+import { parsePersonaMarkdown, parseCompetitorMarkdown } from "@/lib/markdown-to-artifact";
 
 const artifactMeta: Record<
   Artifact["type"],
@@ -146,16 +147,18 @@ function ArtifactPreview({ artifact }: { artifact: Artifact }) {
         );
       }
       return null;
-    case "persona":
+    case "persona": {
+      const persona = parsePersonaMarkdown(artifact.content ?? "");
       return (
         <div className="space-y-2 text-xs">
-          <Section label="Demographics" content={artifact.demographics} />
-          <ListSection label="Goals" items={artifact.goals} />
-          <ListSection label="Frustrations" items={artifact.frustrations} />
-          <ListSection label="Behaviors" items={artifact.behaviors} />
-          <p className="italic text-muted-foreground">"{artifact.quote}"</p>
+          {persona.demographics && <Section label="Demographics" content={persona.demographics} />}
+          {persona.goals.length > 0 && <ListSection label="Goals" items={persona.goals} />}
+          {persona.frustrations.length > 0 && <ListSection label="Frustrations" items={persona.frustrations} />}
+          {persona.behaviors.length > 0 && <ListSection label="Behaviors" items={persona.behaviors} />}
+          {persona.quote && <p className="italic text-muted-foreground">"{persona.quote}"</p>}
         </div>
       );
+    }
     case "featureTree":
       return (
         <div className="text-xs space-y-1">
@@ -163,16 +166,18 @@ function ArtifactPreview({ artifact }: { artifact: Artifact }) {
           <FeatureTreePreview nodes={artifact.children} depth={0} />
         </div>
       );
-    case "competitor":
+    case "competitor": {
+      const comp = parseCompetitorMarkdown(artifact.content ?? "");
       return (
         <div className="space-y-2 text-xs">
-          <Section label="Positioning" content={artifact.positioning} />
-          <ListSection label="Strengths" items={artifact.strengths} />
-          <ListSection label="Weaknesses" items={artifact.weaknesses} />
-          {artifact.pricing && <Section label="Pricing" content={artifact.pricing} />}
-          <ListSection label="Feature Gaps" items={artifact.featureGaps} />
+          {comp.positioning && <Section label="Positioning" content={comp.positioning} />}
+          {comp.strengths.length > 0 && <ListSection label="Strengths" items={comp.strengths} />}
+          {comp.weaknesses.length > 0 && <ListSection label="Weaknesses" items={comp.weaknesses} />}
+          {comp.pricing && <Section label="Pricing" content={comp.pricing} />}
+          {comp.featureGaps.length > 0 && <ListSection label="Feature Gaps" items={comp.featureGaps} />}
         </div>
       );
+    }
   }
 }
 
@@ -238,13 +243,11 @@ function getArtifactTitle(artifact: Artifact): string {
   switch (artifact.type) {
     case "plan":
     case "prd":
-      return artifact.title;
     case "persona":
-      return artifact.name;
+    case "competitor":
+      return artifact.title;
     case "featureTree":
       return artifact.rootFeature;
-    case "competitor":
-      return artifact.name;
   }
 }
 
@@ -259,10 +262,9 @@ function getArtifactSummary(artifact: Artifact): string {
       if (artifact.sections) return artifact.sections.overview.slice(0, 120);
       return "";
     case "persona":
-      return `${artifact.demographics} — "${artifact.quote}"`.slice(0, 120);
+    case "competitor":
+      return (artifact.content ?? "").slice(0, 120);
     case "featureTree":
       return `${artifact.children.length} top-level features`;
-    case "competitor":
-      return artifact.positioning.slice(0, 120);
   }
 }

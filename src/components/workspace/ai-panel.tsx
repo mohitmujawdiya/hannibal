@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
@@ -82,9 +82,8 @@ export function AiPanel({ projectId }: AiPanelProps) {
   const isLoading = status === "submitted";
 
   useEffect(() => {
-    const viewport = scrollRef.current?.querySelector("[data-slot='scroll-area-viewport']") as HTMLElement | null;
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight;
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -132,8 +131,8 @@ export function AiPanel({ projectId }: AiPanelProps) {
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
-        <div className="space-y-4 pb-4 px-4 py-3 w-full overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollRef}>
+        <div className="space-y-4 pb-4 px-4 py-3 w-full min-w-0">
           {messages.map((message) => (
             <div key={message.id} className="space-y-1">
               {message.role === "user" ? (
@@ -149,7 +148,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
                       return (
                         <div
                           key={i}
-                          className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm max-w-none break-words overflow-hidden [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_code]:text-xs"
+                          className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm !max-w-none w-full break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_code]:text-xs"
                         >
                           <MessageMarkdown content={part.text} />
                         </div>
@@ -173,7 +172,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input */}
       <Separator />
