@@ -18,7 +18,6 @@ import {
   Network,
   ChevronRight,
   ChevronDown,
-  Copy,
   Trash2,
   Plus,
   Undo2,
@@ -28,12 +27,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore, useFeatureTrees } from "@/stores/artifact-store";
-import { featureTreeToMarkdown } from "@/lib/artifact-to-markdown";
-import type { FeatureNode } from "@/lib/artifact-types";
+import { useArtifactStore, useFeatureTrees, softDeleteArtifact } from "@/stores/artifact-store";
+import { featureTreeToMarkdown, featureTreeToContentMarkdown } from "@/lib/artifact-to-markdown";
+import type { FeatureNode, FeatureTreeArtifact } from "@/lib/artifact-types";
 import { getLayoutedElements } from "@/lib/feature-tree-to-flow";
 import { FeatureFlowNode } from "./feature-flow-node";
 import "@xyflow/react/dist/style.css";
@@ -148,7 +148,6 @@ function useUndoRedo<T>(maxHistory = 50) {
 function FeatureTreeContent({ projectId }: { projectId: string }) {
   const trees = useFeatureTrees();
   const updateArtifact = useArtifactStore((s) => s.updateArtifact);
-  const removeArtifact = useArtifactStore((s) => s.removeArtifact);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const [viewMode, setViewMode] = useState<"flow" | "list">("flow");
 
@@ -157,6 +156,17 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
   const totalFeatures = countFeatures(children);
 
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo<FeatureNode[]>();
+
+  const updateTree = useCallback(
+    (updates: Partial<FeatureTreeArtifact>) => {
+      if (!tree) return;
+      const root = updates.rootFeature ?? tree.rootFeature;
+      const kids = updates.children ?? tree.children;
+      const content = featureTreeToContentMarkdown(root, kids);
+      updateArtifact(tree.id, { ...updates, content });
+    },
+    [tree, updateArtifact],
+  );
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () =>
@@ -182,11 +192,9 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
     }
   }, [tree, setNodes, setEdges]);
 
-  const handleCopy = () => {
-    if (tree) navigator.clipboard.writeText(featureTreeToMarkdown(tree));
-  };
+  const getCopyText = () => tree ? featureTreeToMarkdown(tree) : "";
   const handleDelete = () => {
-    if (tree) removeArtifact(tree.id);
+    if (tree) softDeleteArtifact(tree.id);
   };
 
   const handleAddChild = useCallback(
@@ -196,9 +204,9 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
       const path = nodeIdToPath(nodeId);
       const newNode: FeatureNode = { title: "New feature", description: "" };
       const newChildren = addChildAtPath(tree.children, path, newNode);
-      updateArtifact(tree.id, { children: newChildren });
+      updateTree({ children: newChildren });
     },
-    [tree, updateArtifact, pushUndo],
+    [tree, updateTree, pushUndo],
   );
 
   const [locked, setLocked] = useState(false);
@@ -250,9 +258,9 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
       for (const { path } of paths) {
         newChildren = removeNodeAtPath(newChildren, path);
       }
-      updateArtifact(tree.id, { children: newChildren });
+      updateTree({ children: newChildren });
     },
-    [tree, updateArtifact, pushUndo],
+    [tree, updateTree, pushUndo],
   );
 
   const handleDeleteNode = useCallback(
@@ -261,9 +269,9 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
       pushUndo(tree.children);
       const path = nodeIdToPath(nodeId);
       const newChildren = removeNodeAtPath(tree.children, path);
-      updateArtifact(tree.id, { children: newChildren });
+      updateTree({ children: newChildren });
     },
-    [tree, updateArtifact, pushUndo],
+    [tree, updateTree, pushUndo],
   );
 
   const handleUpdate = useCallback(
@@ -274,28 +282,28 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
       if (!tree) return;
       if (nodeId === "root") {
         if (update.title != null)
-          updateArtifact(tree.id, { rootFeature: update.title });
+          updateTree({ rootFeature: update.title });
         return;
       }
       pushUndo(tree.children);
       const path = nodeIdToPath(nodeId);
       const newChildren = updateNodeAtPath(tree.children, path, update);
-      updateArtifact(tree.id, { children: newChildren });
+      updateTree({ children: newChildren });
     },
-    [tree, updateArtifact, pushUndo],
+    [tree, updateTree, pushUndo],
   );
 
   const handleUndo = useCallback(() => {
     if (!tree) return;
     const prev = undo(tree.children);
-    if (prev) updateArtifact(tree.id, { children: prev });
-  }, [tree, undo, updateArtifact]);
+    if (prev) updateTree({ children: prev });
+  }, [tree, undo, updateTree]);
 
   const handleRedo = useCallback(() => {
     if (!tree) return;
     const next = redo(tree.children);
-    if (next) updateArtifact(tree.id, { children: next });
-  }, [tree, redo, updateArtifact]);
+    if (next) updateTree({ children: next });
+  }, [tree, redo, updateTree]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -326,7 +334,7 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
   if (trees.length === 0) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border px-6 py-[16px]">
+        <div className="border-b border-border px-6 h-11 flex items-center">
           <h2 className="text-sm font-semibold">Feature Tree</h2>
         </div>
         <div className="flex flex-1 items-center justify-center">
@@ -353,16 +361,10 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 py-[16px] flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold">Feature Tree</h2>
-          <p className="text-xs text-muted-foreground">{activeTree.rootFeature}</p>
-        </div>
+      <div className="border-b border-border px-6 h-11 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Feature Tree</h2>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="h-7" onClick={handleCopy}>
-            <Copy className="h-3.5 w-3.5 mr-1" />
-            Copy
-          </Button>
+          <CopyButton getText={getCopyText} />
           <Button
             variant="ghost"
             size="sm"
@@ -494,7 +496,6 @@ function TreeNode({
   onDelete?: (nodeId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(depth < 1);
-  const [descExpanded, setDescExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(node.title === "New feature");
   const [editTitle, setEditTitle] = useState(node.title);
   const [editDesc, setEditDesc] = useState(node.description ?? "");
@@ -531,11 +532,6 @@ function TreeNode({
     "border-l-orange-400",
   ];
 
-  const isExpandable = !!(
-    node.description &&
-    (node.description.includes("\n") || node.description.length > 80)
-  );
-
   return (
     <div>
       <div
@@ -544,34 +540,37 @@ function TreeNode({
           !isEditing && "hover:bg-accent/50",
           depth > 0 && `border-l-2 ${depthColors[depth % depthColors.length]}`,
         )}
-        style={{ marginLeft: depth > 0 ? depth * 16 : 0 }}
+        style={{ marginLeft: depth > 0 ? depth * 40 : 0 }}
         onDoubleClick={() => onUpdate && setIsEditing(true)}
       >
         {isEditing && onUpdate ? (
           <div
             ref={formRef}
-            className="px-3 py-2 space-y-2"
+            className="flex items-start gap-2 px-3 py-2"
             onBlur={handleBlur}
           >
-            <Input
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSave();
-                if (e.key === "Escape") setIsEditing(false);
-              }}
-              placeholder="Feature title"
-              className="h-8 text-sm"
-              autoFocus
-            />
-            <textarea
-              value={editDesc}
-              onChange={(e) => setEditDesc(e.target.value)}
-              onKeyDown={(e) => e.key === "Escape" && setIsEditing(false)}
-              placeholder={"Description — supports markdown\n- Acceptance criteria\n- Technical notes\n- Edge cases"}
-              className="min-h-[80px] w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-xs resize-y focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-              rows={4}
-            />
+            <GitBranch className="h-3.5 w-3.5 text-muted-foreground mt-2.5 shrink-0 ml-0.5" />
+            <div className="flex-1 min-w-0 space-y-2">
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSave();
+                  if (e.key === "Escape") setIsEditing(false);
+                }}
+                placeholder="Feature title"
+                className="h-8 text-sm font-medium"
+                autoFocus
+              />
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && setIsEditing(false)}
+                placeholder={"Description — supports markdown\n- Acceptance criteria\n- Technical notes\n- Edge cases"}
+                className="min-h-[80px] w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                rows={3}
+              />
+            </div>
           </div>
         ) : (
           <>
@@ -579,7 +578,6 @@ function TreeNode({
               className="w-full flex items-start gap-2 px-3 py-2 text-left cursor-pointer"
               onClick={() => {
                 if (hasChildren) setExpanded((v) => !v);
-                else if (isExpandable) setDescExpanded((v) => !v);
               }}
             >
               {hasChildren ? (
@@ -595,10 +593,12 @@ function TreeNode({
                 <span className={cn("text-sm font-medium", depth === 0 && "text-base")}>
                   {node.title}
                 </span>
-                {node.description && !descExpanded && (
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {node.description.split("\n")[0]}
-                  </p>
+                {node.description && (
+                  <div className="prose prose-invert prose-sm max-w-none text-sm text-muted-foreground mt-0.5 [&_p]:mb-1 [&_ul]:mb-1 [&_ol]:mb-1 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_code]:text-xs [&_pre]:text-xs">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {node.description}
+                    </ReactMarkdown>
+                  </div>
                 )}
               </div>
               {hasChildren && (
@@ -634,21 +634,6 @@ function TreeNode({
               </div>
             </div>
 
-            {descExpanded && node.description && (
-              <div
-                className="px-3 pb-2 pt-0"
-                style={{ paddingLeft: 12 + 16 + 8 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="border-t border-border/30 pt-2">
-                  <div className="prose prose-invert prose-xs max-w-none text-xs [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs [&_code]:text-[10px] [&_pre]:text-[10px]">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {node.description}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

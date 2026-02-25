@@ -65,7 +65,7 @@ export function FeatureFlowNode({
               if (e.key === "Escape") setIsEditing(false);
             }}
             placeholder="Feature title"
-            className="h-8 text-sm"
+            className="h-8 text-sm font-medium"
             autoFocus
           />
           <textarea
@@ -75,7 +75,7 @@ export function FeatureFlowNode({
               if (e.key === "Escape") setIsEditing(false);
             }}
             placeholder={"Description — supports markdown\n- Acceptance criteria\n- Technical notes\n- Edge cases"}
-            className="min-h-[80px] w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-xs resize-y focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+            className="min-h-[80px] w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-xs text-muted-foreground resize-y focus:outline-none focus:ring-2 focus:ring-ring"
             rows={4}
           />
         </div>

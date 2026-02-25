@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   Sparkles,
-  Copy,
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useArtifactStore, useFeatureTrees } from "@/stores/artifact-store";
@@ -26,7 +26,7 @@ import {
   CONFIDENCE_OPTIONS,
   type FlatFeature,
 } from "@/lib/rice-scoring";
-import { prioritiesToMarkdown } from "@/lib/artifact-to-markdown";
+import { prioritiesToMarkdown, featureTreeToContentMarkdown } from "@/lib/artifact-to-markdown";
 
 function updateNodeAtPath(
   children: FeatureNode[],
@@ -164,7 +164,7 @@ function ScoreCell({
           const v = e.target.value ? Number(e.target.value) : undefined;
           onChange(v);
         }}
-        className="h-7 w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-7 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <option value="">—</option>
         {IMPACT_OPTIONS.map((o) => (
@@ -184,7 +184,7 @@ function ScoreCell({
           const v = e.target.value ? Number(e.target.value) : undefined;
           onChange(v);
         }}
-        className="h-7 w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-7 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <option value="">—</option>
         {CONFIDENCE_OPTIONS.map((o) => (
@@ -287,7 +287,7 @@ function SortHeader({
       onClick={() => onSort(sortKey)}
       title={tooltip}
       className={cn(
-        "flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors",
+        "flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors",
         active && "text-foreground",
         className,
       )}
@@ -379,7 +379,7 @@ function FeatureRow({
               onChange={(v) => onScoreUpdate(f.path, "reach", v)}
             />
           </td>
-          <td className="px-2 py-2">
+          <td className="px-2 py-2 whitespace-nowrap">
             <ScoreCell
               value={f.node.impact}
               placeholder="—"
@@ -387,7 +387,7 @@ function FeatureRow({
               onChange={(v) => onScoreUpdate(f.path, "impact", v)}
             />
           </td>
-          <td className="px-2 py-2">
+          <td className="px-2 py-2 whitespace-nowrap">
             <ScoreCell
               value={f.node.confidence}
               placeholder="—"
@@ -479,20 +479,21 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
       const newChildren = updateNodeAtPath(tree.children, path, {
         [field]: value,
       });
-      updateArtifact(tree.id, { children: newChildren });
+      const content = featureTreeToContentMarkdown(tree.rootFeature, newChildren);
+      updateArtifact(tree.id, { children: newChildren, content });
     },
     [tree, updateArtifact],
   );
 
-  const handleCopy = useCallback(() => {
-    if (!tree) return;
-    navigator.clipboard.writeText(prioritiesToMarkdown(tree));
+  const getCopyText = useCallback(() => {
+    if (!tree) return "";
+    return prioritiesToMarkdown(tree);
   }, [tree]);
 
   if (!tree) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border px-6 py-[16px]">
+        <div className="border-b border-border px-6 h-11 flex items-center">
           <h2 className="text-sm font-semibold">Priorities</h2>
         </div>
         <div className="flex flex-1 items-center justify-center">
@@ -517,18 +518,10 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 py-[16px] flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold">Priorities</h2>
-          <p className="text-xs text-muted-foreground">
-            {scoredCount}/{leaves.length} scored &middot; RICE framework
-          </p>
-        </div>
+      <div className="border-b border-border px-6 h-11 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Priorities</h2>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="h-7" onClick={handleCopy}>
-            <Copy className="h-3.5 w-3.5 mr-1" />
-            Copy
-          </Button>
+          <CopyButton getText={getCopyText} />
           <div className="flex items-center border border-border rounded-md overflow-hidden">
             <Button
               variant={viewMode === "ranked" ? "secondary" : "ghost"}
@@ -557,11 +550,11 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
+      <div className="flex-1 overflow-auto px-4 pt-4">
+        <table className="w-full text-sm table-auto">
           <thead className="sticky top-0 bg-background border-b border-border z-10">
             <tr>
-              <th className="text-left px-4 py-2.5 w-[35%]">
+              <th className="text-left px-4 py-2.5 w-full">
                 <SortHeader
                   label="Feature"
                   sortKey="feature"
@@ -570,7 +563,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   onSort={handleSort}
                 />
               </th>
-              <th className="text-left px-2 py-2.5 w-[11%]">
+              <th className="text-left px-2 py-2.5 whitespace-nowrap">
                 <SortHeader
                   label="Reach"
                   sortKey="reach"
@@ -580,7 +573,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   tooltip="How many users will this affect? (1-10)"
                 />
               </th>
-              <th className="text-left px-2 py-2.5 w-[14%]">
+              <th className="text-left px-2 py-2.5 whitespace-nowrap">
                 <SortHeader
                   label="Impact"
                   sortKey="impact"
@@ -590,7 +583,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   tooltip="How much will this move the needle? (Minimal 0.25 → Massive 3)"
                 />
               </th>
-              <th className="text-left px-2 py-2.5 w-[14%]">
+              <th className="text-left px-2 py-2.5 whitespace-nowrap">
                 <SortHeader
                   label="Confidence"
                   sortKey="confidence"
@@ -600,7 +593,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   tooltip="How sure are you about these estimates? (50% / 80% / 100%)"
                 />
               </th>
-              <th className="text-left px-2 py-2.5 w-[11%]">
+              <th className="text-left px-2 py-2.5 whitespace-nowrap">
                 <SortHeader
                   label="Effort"
                   sortKey="effort"
@@ -610,7 +603,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   tooltip="Estimated effort in person-weeks (0.5+)"
                 />
               </th>
-              <th className="text-right px-4 py-2.5 w-[15%]">
+              <th className="text-right px-4 py-2.5 whitespace-nowrap">
                 <SortHeader
                   label="RICE Score"
                   sortKey="score"

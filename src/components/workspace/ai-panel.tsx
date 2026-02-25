@@ -11,10 +11,17 @@ import {
   MoreHorizontal,
   Loader2,
   Square,
+  ChevronDown,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
@@ -22,11 +29,18 @@ import { useArtifactStore } from "@/stores/artifact-store";
 import { ArtifactCard } from "@/components/ai/artifact-card";
 import { localChatStore } from "@/lib/chat-persistence";
 import type { Artifact, FeatureNode } from "@/lib/artifact-types";
+import { featureTreeToContentMarkdown } from "@/lib/artifact-to-markdown";
 import { useFeatureTrees } from "@/stores/artifact-store";
 
 type AiPanelProps = {
   projectId: string;
 };
+
+const MODEL_OPTIONS = [
+  { id: "gpt-4o", label: "GPT-4o" },
+  { id: "gpt-4o-mini", label: "GPT-4o Mini" },
+  { id: "o3-mini", label: "o3 Mini" },
+] as const;
 
 const WELCOME_MESSAGE = "Hey! I'm Hannibal, your AI product co-pilot. Describe a problem you're trying to solve, and I'll help you research it, plan it, and build it.\n\nTry something like:\n- \"I want to build a fitness tracking app\"\n- \"Help me analyze the competitor landscape for task management tools\"\n- \"Generate user personas for an e-commerce platform\"";
 
@@ -39,7 +53,10 @@ export function AiPanel({ projectId }: AiPanelProps) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isAtBottom = useRef(true);
   const [input, setInput] = useState("");
+  const [model, setModel] = useState("gpt-4o");
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   const welcomeMessages = useMemo(() => [
     {
@@ -50,8 +67,8 @@ export function AiPanel({ projectId }: AiPanelProps) {
     },
   ], []);
 
-  const bodyRef = useRef({ activeView, selectedEntity, highlightedText, artifacts });
-  bodyRef.current = { activeView, selectedEntity, highlightedText, artifacts };
+  const bodyRef = useRef({ activeView, selectedEntity, highlightedText, artifacts, model });
+  bodyRef.current = { activeView, selectedEntity, highlightedText, artifacts, model };
 
   const transport = useMemo(
     () =>
@@ -81,8 +98,24 @@ export function AiPanel({ projectId }: AiPanelProps) {
   const isStreaming = status === "streaming";
   const isLoading = status === "submitted";
 
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 80;
+    isAtBottom.current = nearBottom;
+    setShowScrollBtn(!nearBottom);
+  }, []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+    isAtBottom.current = true;
+    setShowScrollBtn(false);
+  }, []);
+
   useEffect(() => {
-    if (scrollRef.current) {
+    if (isAtBottom.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
@@ -97,6 +130,8 @@ export function AiPanel({ projectId }: AiPanelProps) {
     const text = input.trim();
     if (!text) return;
     setInput("");
+    isAtBottom.current = true;
+    setShowScrollBtn(false);
     sendMessage({ text });
   }, [input, sendMessage]);
 
@@ -110,15 +145,31 @@ export function AiPanel({ projectId }: AiPanelProps) {
   return (
     <div className="flex h-full flex-col bg-muted/30 border-l border-border/40 w-full min-w-0 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
           <span className="text-sm font-semibold">Hannibal AI</span>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-7 w-7">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-xs text-destructive focus:text-destructive"
+                onClick={() => {
+                  localChatStore.clear(projectId);
+                  setMessages(welcomeMessages as Parameters<typeof setMessages>[0]);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Clear chat
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="ghost"
             size="icon"
@@ -131,47 +182,60 @@ export function AiPanel({ projectId }: AiPanelProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollRef}>
-        <div className="space-y-4 pb-4 px-4 py-3 w-full min-w-0">
-          {messages.map((message) => (
-            <div key={message.id} className="space-y-1">
-              {message.role === "user" ? (
-                <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm text-primary-foreground">
-                    {getUserText(message)}
+      <div className="relative flex-1 min-h-0">
+        <div className="h-full overflow-y-auto" ref={scrollRef} onScroll={handleScroll}>
+          <div className="space-y-4 pb-4 px-4 py-3 w-full min-w-0">
+            {messages.map((message) => (
+              <div key={message.id} className="space-y-1">
+                {message.role === "user" ? (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm text-primary-foreground">
+                      {getUserText(message)}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {message.parts?.map((part, i) => {
-                    if (part.type === "text") {
-                      return (
-                        <div
-                          key={i}
-                          className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm !max-w-none w-full break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_code]:text-xs"
-                        >
-                          <MessageMarkdown content={part.text} />
-                        </div>
-                      );
-                    }
-                    const tool = extractToolInfo(part);
-                    if (tool) {
-                      return renderToolPart(tool, i);
-                    }
-                    return null;
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
+                ) : (
+                  <div className="space-y-2">
+                    {message.parts?.map((part, i) => {
+                      if (part.type === "text") {
+                        return (
+                          <div
+                            key={i}
+                            className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm !max-w-none w-full break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_code]:text-xs"
+                          >
+                            <MessageMarkdown content={part.text} />
+                          </div>
+                        );
+                      }
+                      const tool = extractToolInfo(part);
+                      if (tool) {
+                        return renderToolPart(tool, i);
+                      }
+                      return null;
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
 
-          {isLoading && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Thinking...
-            </div>
-          )}
+            {isLoading && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Thinking...
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Scroll to bottom button */}
+        {showScrollBtn && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom()}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-muted/90 border border-border/50 shadow-md backdrop-blur-sm transition-opacity hover:bg-muted"
+          >
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
       {/* Input */}
@@ -223,6 +287,30 @@ export function AiPanel({ projectId }: AiPanelProps) {
             )}
           </div>
         </form>
+        <div className="mt-1.5 flex items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5 rounded"
+              >
+                {MODEL_OPTIONS.find((m) => m.id === model)?.label ?? "GPT-4o"}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[140px]">
+              {MODEL_OPTIONS.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.id}
+                  onClick={() => setModel(opt.id)}
+                  className={cn("text-xs", model === opt.id && "font-semibold")}
+                >
+                  {opt.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   );
@@ -639,11 +727,16 @@ function RefinedDescriptionCard({
 
   const handleApply = () => {
     if (!tree || applied) return;
+    // Normalize parentPath — the AI may include rootFeature as the first element
+    const normalizedPath =
+      data.parentPath.length > 0 && data.parentPath[0] === tree.rootFeature
+        ? data.parentPath.slice(1)
+        : data.parentPath;
     const tracker = { done: false };
     let newChildren = applyDescriptionToTree(
       tree.children,
       data.featureTitle,
-      data.parentPath,
+      normalizedPath,
       data.description,
       [],
       tracker,
@@ -655,7 +748,8 @@ function RefinedDescriptionCard({
         data.description,
       );
     }
-    updateArtifact(tree.id, { children: newChildren });
+    const content = featureTreeToContentMarkdown(tree.rootFeature, newChildren);
+    updateArtifact(tree.id, { children: newChildren, content });
     setApplied(true);
   };
 
@@ -703,8 +797,19 @@ function PriorityScoresCard({ scores }: { scores: PriorityScore[] }) {
 
   const handleApply = () => {
     if (!tree || applied) return;
-    const newChildren = applyScoresToTree(tree.children, scores);
-    updateArtifact(tree.id, { children: newChildren });
+    // Normalize parentPaths — the AI may include rootFeature as the
+    // first element, but applyScoresToTree builds paths starting from
+    // tree.children (which excludes rootFeature).
+    const normalizedScores = scores.map((s) => ({
+      ...s,
+      parentPath:
+        s.parentPath.length > 0 && s.parentPath[0] === tree.rootFeature
+          ? s.parentPath.slice(1)
+          : s.parentPath,
+    }));
+    const newChildren = applyScoresToTree(tree.children, normalizedScores);
+    const content = featureTreeToContentMarkdown(tree.rootFeature, newChildren);
+    updateArtifact(tree.id, { children: newChildren, content });
     setApplied(true);
   };
 

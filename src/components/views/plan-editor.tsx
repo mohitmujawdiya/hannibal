@@ -4,25 +4,20 @@ import { useEffect, useState } from "react";
 import {
   FileText,
   Sparkles,
-  Copy,
   Trash2,
   LayoutGrid,
-  Target,
-  Users,
-  Lightbulb,
-  Wrench,
-  TrendingUp,
-  AlertTriangle,
-  Clock,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore, usePlans } from "@/stores/artifact-store";
+import { useArtifactStore, usePlans, softDeleteArtifact } from "@/stores/artifact-store";
 import { MarkdownDoc } from "@/components/editor/markdown-doc";
 import { planToMarkdown } from "@/lib/artifact-to-markdown";
-import { parsePlanMarkdown } from "@/lib/markdown-to-artifact";
+import { parseMarkdownSections } from "@/lib/parse-markdown-sections";
 import type { PlanArtifact } from "@/lib/artifact-types";
 
 function getPlanContent(plan: PlanArtifact): string {
@@ -34,7 +29,6 @@ function getPlanContent(plan: PlanArtifact): string {
 export function PlanEditorView({ projectId }: { projectId: string }) {
   const plans = usePlans();
   const updateArtifact = useArtifactStore((s) => s.updateArtifact);
-  const removeArtifact = useArtifactStore((s) => s.removeArtifact);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const [viewMode, setViewMode] = useState<"card" | "markdown">("card");
 
@@ -52,7 +46,7 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   if (plans.length === 0) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border px-6 py-[16px]">
+        <div className="border-b border-border px-6 h-11 flex items-center">
           <h2 className="text-sm font-semibold">Implementation Plan</h2>
         </div>
         <div className="flex flex-1 items-center justify-center">
@@ -78,17 +72,10 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   const activePlan = plan!;
   const content = getPlanContent(activePlan);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(content);
-  };
-
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 py-[16px] flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold">{activePlan.title}</h2>
-          <p className="text-xs text-muted-foreground">Implementation Plan</p>
-        </div>
+      <div className="border-b border-border px-6 h-11 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Implementation Plan</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-md border border-border">
             <Button
@@ -108,15 +95,12 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
               <FileText className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <Button variant="ghost" size="sm" className="h-7" onClick={handleCopy}>
-            <Copy className="h-3.5 w-3.5 mr-1" />
-            Copy
-          </Button>
+          <CopyButton getText={() => content} />
           <Button
             variant="ghost"
             size="sm"
             className="h-7 text-destructive hover:text-destructive"
-            onClick={() => removeArtifact(activePlan.id)}
+            onClick={() => softDeleteArtifact(activePlan.id)}
           >
             <Trash2 className="h-3.5 w-3.5 mr-1" />
             Delete
@@ -140,31 +124,17 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
             />
           </div>
         ) : (
-          <PlanCardLayout content={content} />
+          <SectionCardLayout content={content} />
         )}
       </div>
     </div>
   );
 }
 
-function PlanCardLayout({ content }: { content: string }) {
-  const parsed = parsePlanMarkdown(content);
+function SectionCardLayout({ content }: { content: string }) {
+  const sections = parseMarkdownSections(content);
 
-  const sections: { icon: React.ElementType; title: string; color: string; content: string | string[]; type: "text" | "list" }[] = [
-    { icon: Target, title: "Problem Statement", color: "text-red-400", content: parsed.problemStatement, type: "text" },
-    { icon: Users, title: "Target Users", color: "text-blue-400", content: parsed.targetUsers, type: "list" },
-    { icon: Lightbulb, title: "Proposed Solution", color: "text-green-400", content: parsed.proposedSolution, type: "text" },
-    { icon: Wrench, title: "Technical Approach", color: "text-purple-400", content: parsed.technicalApproach, type: "text" },
-    { icon: TrendingUp, title: "Success Metrics", color: "text-emerald-400", content: parsed.successMetrics, type: "list" },
-    { icon: AlertTriangle, title: "Risks", color: "text-amber-400", content: parsed.risks, type: "list" },
-    { icon: Clock, title: "Timeline", color: "text-cyan-400", content: parsed.timeline, type: "text" },
-  ];
-
-  const nonEmpty = sections.filter((s) =>
-    s.type === "list" ? (s.content as string[]).length > 0 : (s.content as string).trim().length > 0
-  );
-
-  if (nonEmpty.length === 0) {
+  if (sections.length === 0) {
     return (
       <div className="text-center text-muted-foreground text-sm py-12">
         No plan content to display. Switch to markdown view to add content.
@@ -174,29 +144,20 @@ function PlanCardLayout({ content }: { content: string }) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
-      {nonEmpty.map((section) => (
-        <Card key={section.title}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
+      {sections.map((section) => (
+        <Card key={section.title} className="gap-2">
+          <CardHeader className="pb-0">
+            <CardTitle className="text-base flex items-center gap-2">
               <section.icon className={`h-4 w-4 ${section.color}`} />
               {section.title}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {section.type === "text" ? (
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {section.content as string}
-              </p>
-            ) : (
-              <ul className="space-y-1.5">
-                {(section.content as string[]).map((item, i) => (
-                  <li key={i} className="text-sm flex items-start gap-2">
-                    <span className={`mt-1.5 h-1.5 w-1.5 rounded-full ${section.color.replace("text-", "bg-")} shrink-0`} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className={`prose prose-sm dark:prose-invert max-w-none text-sm text-foreground [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_ul]:pl-3 [&_ol]:pl-3 ${section.color} [&_li]:marker:text-current [&_p]:text-foreground [&_li]:text-foreground`}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {section.body}
+              </ReactMarkdown>
+            </div>
           </CardContent>
         </Card>
       ))}

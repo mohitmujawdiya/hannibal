@@ -79,11 +79,26 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Extract paragraph text (non-bullet, non-heading lines) from a section. */
+/** Extract raw text (not bullet items) from a bold-labeled block: **Label:**\nsome text\nmulti-line */
+function extractBoldText(md: string, label: string): string {
+  const pattern = new RegExp(
+    `\\*\\*${escapeRegex(label)}:\\*\\*\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*[A-Z]|\\n##\\s)`,
+    "m"
+  );
+  const match = md.match(pattern);
+  if (!match) {
+    const fallback = new RegExp(`\\*\\*${escapeRegex(label)}:\\*\\*\\s*\\n([\\s\\S]*)`, "m");
+    const fb = md.match(fallback);
+    return fb ? fb[1].trim() : "";
+  }
+  return match[1].trim();
+}
+
+/** Extract body text from a section (all lines except headings). */
 function extractParagraphText(section: string): string {
   return section
     .split("\n")
-    .filter((line) => !/^\s*-\s/.test(line) && !/^##?\s/.test(line))
+    .filter((line) => !/^##?\s/.test(line))
     .join("\n")
     .trim();
 }
@@ -150,6 +165,7 @@ export type ParsedPersona = {
   goals: string[];
   frustrations: string[];
   behaviors: string[];
+  notes: string;
 };
 
 export function parsePersonaMarkdown(content: string): ParsedPersona {
@@ -161,6 +177,7 @@ export function parsePersonaMarkdown(content: string): ParsedPersona {
     goals: extractBoldList(content, "Goals"),
     frustrations: extractBoldList(content, "Frustrations"),
     behaviors: extractBoldList(content, "Behaviors"),
+    notes: extractBoldText(content, "Notes"),
   };
 }
 
@@ -174,6 +191,7 @@ export type ParsedCompetitor = {
   strengths: string[];
   weaknesses: string[];
   featureGaps: string[];
+  notes: string;
 };
 
 export function parseCompetitorMarkdown(content: string): ParsedCompetitor {
@@ -185,5 +203,6 @@ export function parseCompetitorMarkdown(content: string): ParsedCompetitor {
     strengths: extractBoldList(content, "Strengths"),
     weaknesses: extractBoldList(content, "Weaknesses"),
     featureGaps: extractBoldList(content, "Feature Gaps"),
+    notes: extractBoldText(content, "Notes"),
   };
 }

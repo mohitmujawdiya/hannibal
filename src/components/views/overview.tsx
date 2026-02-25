@@ -105,7 +105,7 @@ export function OverviewView({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 py-[16px]">
+      <div className="border-b border-border px-6 h-11 flex items-center">
         <h2 className="text-sm font-semibold">Overview</h2>
       </div>
 
