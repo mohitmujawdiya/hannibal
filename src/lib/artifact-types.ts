@@ -1,4 +1,4 @@
-export type ArtifactType = "plan" | "prd" | "persona" | "featureTree" | "competitor";
+export type ArtifactType = "plan" | "prd" | "persona" | "featureTree" | "competitor" | "roadmap";
 
 /** Legacy sections format — used only for migration from persisted data */
 export type PlanSections = {
@@ -100,9 +100,42 @@ export type CompetitorArtifact = {
   featureGaps?: string[];
 };
 
+export type RoadmapItemStatus = "not_started" | "in_progress" | "review" | "done";
+export type RoadmapItemType = "feature" | "goal" | "milestone";
+export type RoadmapTimeScale = "weekly" | "monthly" | "quarterly";
+
+export type RoadmapLane = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+export type RoadmapItem = {
+  id: string;
+  title: string;
+  description?: string;
+  laneId: string;
+  startDate: string;       // YYYY-MM-DD
+  endDate: string;         // YYYY-MM-DD (same as start for milestones)
+  status: RoadmapItemStatus;
+  type: RoadmapItemType;
+  sourceFeatureId?: string; // feature tree node title path
+  color?: string;
+};
+
+export type RoadmapArtifact = {
+  type: "roadmap";
+  title: string;
+  content?: string;
+  lanes: RoadmapLane[];
+  items: RoadmapItem[];
+  timeScale: RoadmapTimeScale;
+};
+
 export type Artifact =
   | PlanArtifact
   | PrdArtifact
   | PersonaArtifact
   | FeatureTreeArtifact
-  | CompetitorArtifact;
+  | CompetitorArtifact
+  | RoadmapArtifact;

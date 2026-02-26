@@ -11,7 +11,6 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
@@ -47,8 +46,8 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
   if (prds.length === 0) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border px-6 h-11 flex items-center">
-          <h2 className="text-sm font-semibold">Product Requirements</h2>
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Product Requirements</h2>
         </div>
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center max-w-sm">
@@ -75,14 +74,14 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 h-11 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Product Requirements</h2>
+      <div className="border-b border-border px-6 h-12 flex items-center justify-between">
+        <h2 className="text-base font-semibold">Product Requirements</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-md border border-border">
             <Button
               variant={viewMode === "card" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 rounded-r-none"
+              className="h-8 rounded-r-none"
               onClick={() => setViewMode("card")}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
@@ -90,7 +89,7 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
             <Button
               variant={viewMode === "markdown" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 rounded-l-none"
+              className="h-8 rounded-l-none"
               onClick={() => setViewMode("markdown")}
             >
               <FileText className="h-3.5 w-3.5" />
@@ -100,17 +99,12 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-destructive hover:text-destructive"
+            className="h-8 text-destructive hover:text-destructive"
             onClick={() => softDeleteArtifact(activePrd.id)}
           >
             <Trash2 className="h-3.5 w-3.5 mr-1" />
             Delete
           </Button>
-          {prds.length > 1 && (
-            <Badge variant="secondary" className="text-xs">
-              {prds.length} versions
-            </Badge>
-          )}
         </div>
       </div>
 

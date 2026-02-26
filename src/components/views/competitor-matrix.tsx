@@ -80,8 +80,8 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
   if (competitors.length === 0) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border px-6 h-11 flex items-center">
-          <h2 className="text-sm font-semibold">Competitive Analysis</h2>
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Competitive Analysis</h2>
         </div>
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center max-w-sm">
@@ -113,8 +113,8 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 h-11 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Competitive Analysis</h2>
+      <div className="border-b border-border px-6 h-12 flex items-center justify-between">
+        <h2 className="text-base font-semibold">Competitive Analysis</h2>
         <div className="flex items-center gap-2">
           <CopyButton getText={getCopyText} />
         </div>

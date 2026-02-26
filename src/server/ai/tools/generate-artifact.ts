@@ -1,4 +1,5 @@
 import { tool, jsonSchema } from "ai";
+import type { RoadmapTimeScale } from "@/lib/artifact-types";
 
 const planTool = tool({
   description:
@@ -280,6 +281,158 @@ const refineFeatureDescriptionTool = tool({
   }),
 });
 
+type RoadmapLaneInput = { id: string; name: string; color: string };
+type RoadmapItemInput = {
+  id: string;
+  title: string;
+  description?: string;
+  laneId: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  type: string;
+};
+
+const roadmapTool = tool({
+  description:
+    "Generate a roadmap with swim lanes and timeline items. Use when the PM asks to create a roadmap, timeline, or release plan. Include lanes (categories) and items (features, goals, milestones) with date ranges and statuses.",
+  inputSchema: jsonSchema<{
+    title: string;
+    timeScale: string;
+    lanes: RoadmapLaneInput[];
+    items: RoadmapItemInput[];
+  }>({
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Roadmap title" },
+      timeScale: {
+        type: "string",
+        description: "Time scale: 'weekly', 'monthly', or 'quarterly'",
+        enum: ["weekly", "monthly", "quarterly"],
+      },
+      lanes: {
+        type: "array",
+        description: "Swim lanes (categories like Engineering, Design, Marketing). Use 2-5 lanes.",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Unique lane ID (e.g. 'lane-1')" },
+            name: { type: "string", description: "Lane display name" },
+            color: { type: "string", description: "Hex color (e.g. '#3b82f6')" },
+          },
+          required: ["id", "name", "color"],
+        },
+      },
+      items: {
+        type: "array",
+        description: "Roadmap items. Each item belongs to a lane and spans a date range.",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Unique item ID (e.g. 'ri-1')" },
+            title: { type: "string", description: "Item title" },
+            description: { type: "string", description: "Optional description" },
+            laneId: { type: "string", description: "Lane ID this item belongs to" },
+            startDate: { type: "string", description: "Start date YYYY-MM-DD" },
+            endDate: {
+              type: "string",
+              description: "End date YYYY-MM-DD. For milestones, use same as startDate.",
+            },
+            status: {
+              type: "string",
+              description: "Status: not_started, in_progress, review, or done",
+              enum: ["not_started", "in_progress", "review", "done"],
+            },
+            type: {
+              type: "string",
+              description: "Item type: feature, goal, or milestone",
+              enum: ["feature", "goal", "milestone"],
+            },
+          },
+          required: ["id", "title", "laneId", "startDate", "endDate", "status", "type"],
+        },
+      },
+    },
+    required: ["title", "timeScale", "lanes", "items"],
+  }),
+  execute: async (params) => ({
+    artifact: {
+      type: "roadmap" as const,
+      title: params.title,
+      timeScale: params.timeScale as RoadmapTimeScale,
+      lanes: params.lanes,
+      items: params.items.map((item) => ({
+        ...item,
+        status: item.status as "not_started" | "in_progress" | "review" | "done",
+        type: item.type as "feature" | "goal" | "milestone",
+      })),
+    },
+    status: "generated",
+  }),
+});
+
+type RoadmapOperation = {
+  action: "add" | "update" | "remove";
+  item: {
+    id?: string;
+    title?: string;
+    description?: string;
+    laneId?: string;
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+    type?: string;
+  };
+};
+
+const updateRoadmapTool = tool({
+  description:
+    "Suggest changes to the existing roadmap. Use when the PM asks to update, add, remove, or reschedule items on their roadmap. Returns operations that the PM can apply.",
+  inputSchema: jsonSchema<{ operations: RoadmapOperation[] }>({
+    type: "object",
+    properties: {
+      operations: {
+        type: "array",
+        description: "List of operations to apply to the roadmap",
+        items: {
+          type: "object",
+          properties: {
+            action: {
+              type: "string",
+              description: "Action: add (new item), update (modify existing), remove (delete item)",
+              enum: ["add", "update", "remove"],
+            },
+            item: {
+              type: "object",
+              description:
+                "Item data. For 'add': provide all fields. For 'update': provide id + changed fields. For 'remove': provide id or title.",
+              properties: {
+                id: { type: "string", description: "Item ID (for update/remove)" },
+                title: { type: "string" },
+                description: { type: "string" },
+                laneId: { type: "string" },
+                startDate: { type: "string", description: "YYYY-MM-DD" },
+                endDate: { type: "string", description: "YYYY-MM-DD" },
+                status: {
+                  type: "string",
+                  enum: ["not_started", "in_progress", "review", "done"],
+                },
+                type: { type: "string", enum: ["feature", "goal", "milestone"] },
+              },
+            },
+          },
+          required: ["action", "item"],
+        },
+      },
+    },
+    required: ["operations"],
+  }),
+  execute: async (params) => ({
+    roadmapOperations: params.operations,
+    status: "suggested",
+  }),
+});
+
 export const artifactTools = {
   generatePlan: planTool,
   generatePRD: prdTool,
@@ -288,4 +441,6 @@ export const artifactTools = {
   generateCompetitor: competitorTool,
   suggestPriorities: suggestPrioritiesTool,
   refineFeatureDescription: refineFeatureDescriptionTool,
+  generateRoadmap: roadmapTool,
+  updateRoadmap: updateRoadmapTool,
 };

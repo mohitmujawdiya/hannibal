@@ -7,6 +7,7 @@ import {
   Users,
   GitBranch,
   Swords,
+  Map,
   ChevronDown,
   ChevronRight,
   ExternalLink,
@@ -29,6 +30,7 @@ const artifactMeta: Record<
   persona: { icon: Users, label: "User Persona", view: "personas", color: "text-purple-400" },
   featureTree: { icon: GitBranch, label: "Feature Tree", view: "features", color: "text-orange-400" },
   competitor: { icon: Swords, label: "Competitor Analysis", view: "competitors", color: "text-red-400" },
+  roadmap: { icon: Map, label: "Roadmap", view: "roadmap", color: "text-cyan-400" },
 };
 
 export function ArtifactCard({ artifact }: { artifact: Artifact }) {
@@ -178,6 +180,14 @@ function ArtifactPreview({ artifact }: { artifact: Artifact }) {
         </div>
       );
     }
+    case "roadmap":
+      return (
+        <div className="space-y-1.5 text-xs">
+          <Section label="Time Scale" content={artifact.timeScale} />
+          <Section label="Lanes" content={artifact.lanes.map((l) => l.name).join(", ")} />
+          <Section label="Items" content={`${artifact.items.length} item${artifact.items.length !== 1 ? "s" : ""}`} />
+        </div>
+      );
   }
 }
 
@@ -245,6 +255,7 @@ function getArtifactTitle(artifact: Artifact): string {
     case "prd":
     case "persona":
     case "competitor":
+    case "roadmap":
       return artifact.title;
     case "featureTree":
       return artifact.rootFeature;
@@ -266,5 +277,7 @@ function getArtifactSummary(artifact: Artifact): string {
       return (artifact.content ?? "").slice(0, 120);
     case "featureTree":
       return `${artifact.children.length} top-level features`;
+    case "roadmap":
+      return `${artifact.lanes.length} lanes, ${artifact.items.length} items`;
   }
 }

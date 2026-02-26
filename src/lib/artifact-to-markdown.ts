@@ -7,6 +7,8 @@ import type {
   CompetitorArtifact,
   FeatureTreeArtifact,
   FeatureNode,
+  RoadmapArtifact,
+  RoadmapTimeScale,
 } from "./artifact-types";
 import { flattenTree, computeRiceScore, impactLabel } from "./rice-scoring";
 
@@ -194,6 +196,45 @@ export function prioritiesToMarkdown(tree: FeatureTreeArtifact): string {
     const effort = f.node.effort != null ? `${f.node.effort}w` : "—";
     const score = f.riceScore != null ? f.riceScore.toFixed(1) : "—";
     lines.push(`| ${name} | ${reach} | ${impact} | ${confidence} | ${effort} | ${score} |`);
+  }
+
+  return lines.join("\n");
+}
+
+export function roadmapToMarkdown(roadmap: RoadmapArtifact): string {
+  if (roadmap.content != null && roadmap.content.trim()) {
+    return roadmap.content;
+  }
+
+  const lines: string[] = [`# ${roadmap.title}`];
+  const timeScaleLabel: Record<RoadmapTimeScale, string> = { weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly" };
+  lines.push(`**Time Scale:** ${timeScaleLabel[roadmap.timeScale]}`);
+  lines.push("");
+
+  // Lanes section
+  lines.push("## Lanes");
+  for (const lane of roadmap.lanes) {
+    lines.push(`- ${lane.name} (${lane.color})`);
+  }
+  lines.push("");
+
+  // Items grouped by lane
+  lines.push("## Items");
+  for (const lane of roadmap.lanes) {
+    const laneItems = roadmap.items.filter((item) => item.laneId === lane.id);
+    if (laneItems.length === 0) continue;
+    lines.push(`### ${lane.name}`);
+    for (const item of laneItems) {
+      const dateRange =
+        item.type === "milestone"
+          ? `(${item.startDate})`
+          : `(${item.startDate} → ${item.endDate})`;
+      lines.push(`- [${item.type}] ${item.title} ${dateRange} [${item.status}]`);
+      if (item.description) {
+        lines.push(`  ${item.description}`);
+      }
+    }
+    lines.push("");
   }
 
   return lines.join("\n");

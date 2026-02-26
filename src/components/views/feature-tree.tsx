@@ -40,12 +40,6 @@ import "@xyflow/react/dist/style.css";
 
 const nodeTypes = { feature: FeatureFlowNode };
 
-function countFeatures(nodes: FeatureNode[]): number {
-  return nodes.reduce((count, node) => {
-    return count + 1 + (node.children ? countFeatures(node.children) : 0);
-  }, 0);
-}
-
 /** Add a new FeatureNode as child of the node at path. path [] = add to root's children. */
 function addChildAtPath(
   children: FeatureNode[],
@@ -153,7 +147,6 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
 
   const tree = trees.length > 0 ? trees[trees.length - 1] : null;
   const children = tree?.children ?? [];
-  const totalFeatures = countFeatures(children);
 
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo<FeatureNode[]>();
 
@@ -334,8 +327,8 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
   if (trees.length === 0) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border px-6 h-11 flex items-center">
-          <h2 className="text-sm font-semibold">Feature Tree</h2>
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Feature Tree</h2>
         </div>
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center max-w-sm">
@@ -361,24 +354,14 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 h-11 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Feature Tree</h2>
+      <div className="border-b border-border px-6 h-12 flex items-center justify-between">
+        <h2 className="text-base font-semibold">Feature Tree</h2>
         <div className="flex items-center gap-2">
-          <CopyButton getText={getCopyText} />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-destructive hover:text-destructive"
-            onClick={handleDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1" />
-            Delete
-          </Button>
           <div className="flex items-center rounded-md border border-border overflow-hidden">
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 rounded-none"
+              className="h-8 px-2 rounded-none"
               onClick={handleUndo}
               disabled={!canUndo}
               title="Undo (⌘Z)"
@@ -388,7 +371,7 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 rounded-none"
+              className="h-8 px-2 rounded-none"
               onClick={handleRedo}
               disabled={!canRedo}
               title="Redo (⌘⇧Z)"
@@ -401,7 +384,7 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
               variant="ghost"
               size="sm"
               className={cn(
-                "h-7 px-2 rounded-none",
+                "h-8 px-2 rounded-none",
                 viewMode === "flow" && "bg-muted",
               )}
               onClick={() => setViewMode("flow")}
@@ -412,7 +395,7 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
               variant="ghost"
               size="sm"
               className={cn(
-                "h-7 px-2 rounded-none",
+                "h-8 px-2 rounded-none",
                 viewMode === "list" && "bg-muted",
               )}
               onClick={() => setViewMode("list")}
@@ -420,9 +403,16 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
               <List className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <Badge variant="secondary" className="text-xs">
-            {totalFeatures} feature{totalFeatures !== 1 ? "s" : ""}
-          </Badge>
+          <CopyButton getText={getCopyText} />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-destructive hover:text-destructive"
+            onClick={handleDelete}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Delete
+          </Button>
         </div>
       </div>
 

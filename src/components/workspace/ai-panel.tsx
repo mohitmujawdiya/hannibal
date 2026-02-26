@@ -28,8 +28,10 @@ import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { ArtifactCard } from "@/components/ai/artifact-card";
 import { localChatStore } from "@/lib/chat-persistence";
-import type { Artifact, FeatureNode } from "@/lib/artifact-types";
-import { featureTreeToContentMarkdown } from "@/lib/artifact-to-markdown";
+import type { Artifact, FeatureNode, RoadmapArtifact, RoadmapItem } from "@/lib/artifact-types";
+import { featureTreeToContentMarkdown, roadmapToMarkdown } from "@/lib/artifact-to-markdown";
+import { useRoadmaps } from "@/stores/artifact-store";
+import { generateId } from "@/lib/roadmap-utils";
 import { useFeatureTrees } from "@/stores/artifact-store";
 
 type AiPanelProps = {
@@ -145,16 +147,16 @@ export function AiPanel({ projectId }: AiPanelProps) {
   return (
     <div className="flex h-full flex-col bg-muted/30 border-l border-border/40 w-full min-w-0 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-border shrink-0">
+      <div className="flex items-center justify-between px-4 h-12 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-sm font-semibold">Hannibal AI</span>
+          <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <span className="text-base font-semibold">Hannibal AI</span>
         </div>
         <div className="flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -173,10 +175,10 @@ export function AiPanel({ projectId }: AiPanelProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-8 w-8"
             onClick={toggleAiPanel}
           >
-            <PanelRightClose className="h-4 w-4" />
+            <PanelRightClose className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
@@ -331,6 +333,8 @@ const ARTIFACT_TOOL_LABELS: Record<string, string> = {
   generateCompetitor: "Analyzing competitor",
   suggestPriorities: "Scoring features",
   refineFeatureDescription: "Refining description",
+  generateRoadmap: "Building roadmap",
+  updateRoadmap: "Updating roadmap",
 };
 
 function extractToolInfo(part: unknown): ToolInfo | null {
@@ -441,6 +445,32 @@ function renderToolPart(tool: ToolInfo, key: number) {
         key={key}
         icon={Sparkles}
         label="Scoring features"
+      />
+    );
+  }
+
+  if (tool.toolName === "updateRoadmap") {
+    if (isComplete && tool.output) {
+      const result = tool.output as {
+        roadmapOperations?: {
+          action: string;
+          item: Partial<RoadmapItem> & { title?: string; id?: string };
+        }[];
+      };
+      if (result.roadmapOperations) {
+        return (
+          <RoadmapOperationsCard
+            key={key}
+            operations={result.roadmapOperations}
+          />
+        );
+      }
+    }
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={Sparkles}
+        label="Updating roadmap"
       />
     );
   }
@@ -850,6 +880,110 @@ function PriorityScoresCard({ scores }: { scores: PriorityScore[] }) {
         disabled={!tree}
       >
         {applied ? "View in Priorities" : "Apply Scores to Feature Tree"}
+      </Button>
+    </div>
+  );
+}
+
+type RoadmapOp = {
+  action: string;
+  item: Partial<RoadmapItem> & { title?: string; id?: string };
+};
+
+function RoadmapOperationsCard({ operations }: { operations: RoadmapOp[] }) {
+  const [applied, setApplied] = useState(false);
+  const roadmaps = useRoadmaps();
+  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const setActiveView = useWorkspaceContext((s) => s.setActiveView);
+
+  const roadmap = roadmaps.length > 0 ? roadmaps[roadmaps.length - 1] : null;
+
+  const handleApply = () => {
+    if (!roadmap || applied) return;
+    let newItems = [...roadmap.items];
+
+    for (const op of operations) {
+      if (op.action === "add" && op.item.title) {
+        newItems.push({
+          id: op.item.id || generateId(),
+          title: op.item.title,
+          description: op.item.description,
+          laneId: op.item.laneId || roadmap.lanes[0]?.id || "",
+          startDate: op.item.startDate || new Date().toISOString().slice(0, 10),
+          endDate: op.item.endDate || new Date().toISOString().slice(0, 10),
+          status: (op.item.status as RoadmapItem["status"]) || "not_started",
+          type: (op.item.type as RoadmapItem["type"]) || "feature",
+        });
+      } else if (op.action === "update") {
+        const idx = newItems.findIndex(
+          (it) => it.id === op.item.id || it.title === op.item.title,
+        );
+        if (idx >= 0) {
+          newItems[idx] = { ...newItems[idx], ...op.item, id: newItems[idx].id } as RoadmapItem;
+        }
+      } else if (op.action === "remove") {
+        newItems = newItems.filter(
+          (it) => it.id !== op.item.id && it.title !== op.item.title,
+        );
+      }
+    }
+
+    const content = roadmapToMarkdown({
+      ...roadmap,
+      items: newItems,
+      content: undefined,
+    } as RoadmapArtifact);
+    updateArtifact(roadmap.id, { items: newItems, content });
+    setApplied(true);
+  };
+
+  const addCount = operations.filter((o) => o.action === "add").length;
+  const updateCount = operations.filter((o) => o.action === "update").length;
+  const removeCount = operations.filter((o) => o.action === "remove").length;
+  const parts: string[] = [];
+  if (addCount) parts.push(`${addCount} add`);
+  if (updateCount) parts.push(`${updateCount} update`);
+  if (removeCount) parts.push(`${removeCount} remove`);
+
+  return (
+    <div className="rounded-lg border border-border/50 bg-muted/40 p-3 my-1 space-y-2">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-medium">
+          Roadmap Changes ({parts.join(", ")})
+        </span>
+      </div>
+      <div className="max-h-[200px] overflow-auto text-xs space-y-1.5">
+        {operations.slice(0, 8).map((op, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className={cn(
+              "shrink-0 text-[10px] font-medium uppercase px-1 rounded",
+              op.action === "add" && "text-green-400 bg-green-400/10",
+              op.action === "update" && "text-blue-400 bg-blue-400/10",
+              op.action === "remove" && "text-red-400 bg-red-400/10",
+            )}>
+              {op.action}
+            </span>
+            <span className="truncate text-foreground">
+              {op.item.title || op.item.id}
+            </span>
+          </div>
+        ))}
+        {operations.length > 8 && (
+          <div className="text-muted-foreground">+{operations.length - 8} more</div>
+        )}
+      </div>
+      <Button
+        size="sm"
+        variant={applied ? "outline" : "secondary"}
+        className="h-7 text-xs w-full justify-center"
+        onClick={() => {
+          handleApply();
+          setActiveView("roadmap");
+        }}
+        disabled={!roadmap}
+      >
+        {applied ? "View Roadmap" : "Apply Changes"}
       </Button>
     </div>
   );

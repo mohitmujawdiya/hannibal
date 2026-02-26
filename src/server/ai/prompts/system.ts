@@ -68,6 +68,8 @@ export function buildSystemPrompt({
 - **generateCompetitor**: Use when asked to analyze a specific competitor. Output markdown with ## Name heading, **URL:**, **Positioning:**, **Pricing:**, **Strengths:** (- bullets), **Weaknesses:** (- bullets), **Feature Gaps:** (- bullets).
 - **refineFeatureDescription**: Use when the PM asks to improve, rewrite, or add detail to a specific feature's description. Match the feature by title and parent path. Adapt the description to the feature's role — acceptance criteria for user-facing leaves, technical constraints for infra, strategic summary for groups. Use markdown formatting.
 - **suggestPriorities**: Use when asked to score, prioritize, or rank features. Only score **leaf features** (features with no children) — parent/group features derive their priority from their children. Provide RICE scores (Reach 1-10, Impact 0.25/0.5/1/2/3, Confidence 50/80/100, Effort in person-weeks minimum 0.5) for each leaf. Include a brief rationale for each score.
+- **generateRoadmap**: Use when asked to create a roadmap, timeline, or release plan. Create swim lanes (e.g. Engineering, Design, Marketing) and place items (features, goals, milestones) with realistic date ranges. Use YYYY-MM-DD format for dates. Set timeScale to "weekly", "monthly", or "quarterly". Milestones should have startDate === endDate. Use IDs like "lane-1", "ri-1" etc.
+- **updateRoadmap**: Use when asked to update, reschedule, add, or remove items on an existing roadmap. Returns operations (add/update/remove) that the PM can apply. For "update" provide the item id plus only the changed fields. For "remove" provide the item id or title.
 
 After using any generate tool, write a brief summary of what you generated and ask if the PM wants to refine anything.
 
@@ -130,6 +132,18 @@ function buildArtifactContext(artifacts: StoredArtifact[]): string {
         const cContent = a.content || "";
         const cTruncated = cContent.length > MAX_CONTENT ? cContent.slice(0, MAX_CONTENT) + "\n...(truncated)" : cContent;
         sections.push(`### [Competitor] "${a.title}"\n${cTruncated}`);
+        break;
+      }
+      case "roadmap": {
+        const laneSummary = a.lanes.map((l: { name: string }) => l.name).join(", ");
+        const itemLines = a.items.slice(0, 20).map(
+          (it: { title: string; type: string; startDate: string; endDate: string; status: string; laneId: string }) => {
+            const lane = a.lanes.find((l: { id: string; name: string }) => l.id === it.laneId);
+            return `- [${it.type}] ${it.title} (${it.startDate} → ${it.endDate}) [${it.status}] in ${lane?.name ?? "?"}`;
+          },
+        ).join("\n");
+        const truncNote = a.items.length > 20 ? `\n...(${a.items.length - 20} more items)` : "";
+        sections.push(`### [Roadmap] "${a.title}"\nTime scale: ${a.timeScale}\nLanes: ${laneSummary}\n${itemLines}${truncNote}`);
         break;
       }
     }

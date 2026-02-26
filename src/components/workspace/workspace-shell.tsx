@@ -53,6 +53,10 @@ export function WorkspaceShell({ projectId, projectName }: WorkspaceShellProps) 
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
+      {/* Collapsed sidebar — fixed width, outside resizable group */}
+      {!sidebarOpen && (
+        <Sidebar projectId={projectId} projectName={projectName} collapsed />
+      )}
       <ResizablePanelGroup orientation="horizontal">
         {sidebarOpen && (
           <>

@@ -206,3 +206,88 @@ export function parseCompetitorMarkdown(content: string): ParsedCompetitor {
     notes: extractBoldText(content, "Notes"),
   };
 }
+
+// ─── Roadmap parser ─────────────────────────────────────────────────
+
+import type {
+  RoadmapLane,
+  RoadmapItem,
+  RoadmapItemStatus,
+  RoadmapItemType,
+  RoadmapTimeScale,
+  RoadmapArtifact,
+} from "./artifact-types";
+
+export type ParsedRoadmap = {
+  title: string;
+  timeScale: RoadmapTimeScale;
+  lanes: RoadmapLane[];
+  items: RoadmapItem[];
+};
+
+let parseCounter = 0;
+
+export function parseRoadmapMarkdown(content: string): ParsedRoadmap {
+  const title = extractH1Title(content) || "Roadmap";
+
+  const timeScaleField = extractBoldField(content, "Time Scale").toLowerCase();
+  const timeScale: RoadmapTimeScale = timeScaleField.includes("quarter")
+    ? "quarterly"
+    : timeScaleField.includes("week")
+      ? "weekly"
+      : "monthly";
+
+  // Parse lanes from "## Lanes" section
+  const lanesSection = extractSection(content, "Lanes");
+  const laneLines = parseBulletLines(lanesSection);
+  const lanes: RoadmapLane[] = laneLines.map((line) => {
+    const colorMatch = line.match(/\(([^)]+)\)\s*$/);
+    const name = colorMatch ? line.replace(colorMatch[0], "").trim() : line.trim();
+    const color = colorMatch ? colorMatch[1] : "#3b82f6";
+    return { id: `lane-${++parseCounter}`, name, color };
+  });
+
+  // Parse items from "## Items" section, grouped by ### LaneName
+  const items: RoadmapItem[] = [];
+  const itemsSection = extractSection(content, "Items");
+  const h3Parts = itemsSection.split(/^###\s+/m).slice(1); // skip text before first ###
+
+  for (const part of h3Parts) {
+    const firstNewline = part.indexOf("\n");
+    const laneName = (firstNewline === -1 ? part : part.slice(0, firstNewline)).trim();
+    const lane = lanes.find((l) => l.name === laneName);
+    if (!lane) continue;
+
+    const body = firstNewline === -1 ? "" : part.slice(firstNewline);
+    const bulletLines = body.split("\n");
+
+    let currentItem: RoadmapItem | null = null;
+    for (const raw of bulletLines) {
+      const itemMatch = raw.match(
+        /^\s*-\s+\[(\w+)\]\s+(.+?)\s+\((\d{4}-\d{2}-\d{2})(?:\s*→\s*(\d{4}-\d{2}-\d{2}))?\)\s+\[(\w+)\]/
+      );
+      if (itemMatch) {
+        if (currentItem) items.push(currentItem);
+        const type = itemMatch[1] as RoadmapItemType;
+        const itemTitle = itemMatch[2].trim();
+        const startDate = itemMatch[3];
+        const endDate = itemMatch[4] || startDate;
+        const status = itemMatch[5] as RoadmapItemStatus;
+        currentItem = {
+          id: `ri-${++parseCounter}`,
+          title: itemTitle,
+          laneId: lane.id,
+          startDate,
+          endDate,
+          status,
+          type,
+        };
+      } else if (currentItem && raw.match(/^\s{2,}\S/)) {
+        currentItem.description = (currentItem.description || "") + raw.trim();
+      }
+    }
+    if (currentItem) items.push(currentItem);
+  }
+
+  return { title, timeScale, lanes, items };
+}

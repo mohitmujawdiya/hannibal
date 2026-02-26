@@ -15,6 +15,7 @@ import {
   Plus,
   ChevronDown,
   Folder,
+  PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import {
 type SidebarProps = {
   projectId: string;
   projectName?: string;
+  collapsed?: boolean;
 };
 
 const viewItems: { id: ViewType; label: string; icon: React.ElementType }[] = [
@@ -48,19 +50,72 @@ const demoProjects = [
   { id: "demo-3", name: "E-commerce Revamp" },
 ];
 
-export function Sidebar({ projectId, projectName }: SidebarProps) {
+export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
   const activeView = useWorkspaceContext((s) => s.activeView);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
+  const toggleSidebar = useWorkspaceContext((s) => s.toggleSidebar);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
+
+  if (collapsed) {
+    return (
+      <div className="flex h-full flex-col items-center bg-sidebar text-sidebar-foreground border-r border-border/50 w-[60px] shrink-0">
+        {/* Logo */}
+        <div className="flex items-center justify-center h-12 shrink-0 border-b border-border w-full">
+          <button
+            onClick={toggleSidebar}
+            className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold hover:opacity-80 transition-opacity"
+            title="Expand sidebar (⌘B)"
+          >
+            H
+          </button>
+        </div>
+
+        {/* View icons */}
+        <div className="flex-1 flex flex-col items-center gap-1 py-2.5">
+          {viewItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveView(item.id)}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-md transition-colors",
+                  activeView === item.id
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                )}
+                title={item.label}
+              >
+                <Icon className="h-5 w-5" />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Bottom */}
+        <Separator className="w-10" />
+        <div className="flex flex-col items-center gap-1 py-3">
+          <div className="h-7 w-7 rounded-full bg-muted" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-4">
+      {/* Logo + collapse */}
+      <div className="flex items-center gap-2 px-4 h-12 shrink-0 border-b border-border">
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">
           H
         </div>
         <span className="text-sm font-semibold tracking-tight">Hannibal</span>
+        <button
+          onClick={toggleSidebar}
+          className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors"
+          title="Collapse sidebar (⌘B)"
+        >
+          <PanelLeftClose className="h-4 w-4" />
+        </button>
       </div>
 
       <ScrollArea className="flex-1 px-2">
@@ -123,7 +178,7 @@ export function Sidebar({ projectId, projectName }: SidebarProps) {
                       : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5" />
                   {item.label}
                 </button>
               );

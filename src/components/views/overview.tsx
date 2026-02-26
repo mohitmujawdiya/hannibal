@@ -58,6 +58,7 @@ const quickActions: {
     title: "Roadmap",
     description: "Plan your timeline and milestones",
     icon: Map,
+    artifactType: "roadmap",
   },
   {
     view: "priorities",
@@ -105,8 +106,8 @@ export function OverviewView({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 h-11 flex items-center">
-        <h2 className="text-sm font-semibold">Overview</h2>
+      <div className="border-b border-border px-6 h-12 flex items-center">
+        <h2 className="text-base font-semibold">Overview</h2>
       </div>
 
       <div className="flex-1 overflow-auto p-8">

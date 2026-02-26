@@ -9,6 +9,7 @@ import type {
   PersonaArtifact,
   FeatureTreeArtifact,
   CompetitorArtifact,
+  RoadmapArtifact,
 } from "@/lib/artifact-types";
 import { personaToMarkdown, competitorToMarkdown, featureTreeToContentMarkdown } from "@/lib/artifact-to-markdown";
 
@@ -140,6 +141,16 @@ export const useCompetitors = () =>
       s.artifacts.filter(
         (a): a is StoredArtifact & CompetitorArtifact =>
           a.type === "competitor"
+      )
+    )
+  );
+
+export const useRoadmaps = () =>
+  useArtifactStore(
+    useShallow((s) =>
+      s.artifacts.filter(
+        (a): a is StoredArtifact & RoadmapArtifact =>
+          a.type === "roadmap"
       )
     )
   );

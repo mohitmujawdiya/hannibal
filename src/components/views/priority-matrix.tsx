@@ -164,7 +164,7 @@ function ScoreCell({
           const v = e.target.value ? Number(e.target.value) : undefined;
           onChange(v);
         }}
-        className="h-7 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-8 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <option value="">—</option>
         {IMPACT_OPTIONS.map((o) => (
@@ -184,7 +184,7 @@ function ScoreCell({
           const v = e.target.value ? Number(e.target.value) : undefined;
           onChange(v);
         }}
-        className="h-7 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-8 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <option value="">—</option>
         {CONFIDENCE_OPTIONS.map((o) => (
@@ -238,7 +238,7 @@ function ScoreCell({
       min={type === "reach" ? 1 : 0.5}
       max={type === "reach" ? 10 : undefined}
       step={type === "reach" ? 1 : 0.5}
-      className="h-7 w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+      className="h-8 w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
       autoFocus
     />
   );
@@ -493,8 +493,8 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
   if (!tree) {
     return (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border px-6 h-11 flex items-center">
-          <h2 className="text-sm font-semibold">Priorities</h2>
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Priorities</h2>
         </div>
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center max-w-sm">
@@ -518,15 +518,14 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border px-6 h-11 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Priorities</h2>
+      <div className="border-b border-border px-6 h-12 flex items-center justify-between">
+        <h2 className="text-base font-semibold">Priorities</h2>
         <div className="flex items-center gap-2">
-          <CopyButton getText={getCopyText} />
           <div className="flex items-center border border-border rounded-md overflow-hidden">
             <Button
               variant={viewMode === "ranked" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 rounded-none border-0 px-2.5"
+              className="h-8 rounded-none border-0 px-2.5"
               onClick={() => setViewMode("ranked")}
               title="Flat ranked list — leaves only, sorted by score"
             >
@@ -536,7 +535,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
             <Button
               variant={viewMode === "grouped" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 rounded-none border-0 px-2.5"
+              className="h-8 rounded-none border-0 px-2.5"
               onClick={() => setViewMode("grouped")}
               title="Grouped by tree hierarchy — sorted within groups"
             >
@@ -544,13 +543,11 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
               Grouped
             </Button>
           </div>
-          <Badge variant="secondary" className="text-xs">
-            {displayFeatures.filter((f) => f.isLeaf).length} leaf{displayFeatures.filter((f) => f.isLeaf).length !== 1 ? "s" : ""}
-          </Badge>
+          <CopyButton getText={getCopyText} />
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-4 pt-4">
+      <div className="flex-1 overflow-auto px-4 py-5">
         <table className="w-full text-sm table-auto">
           <thead className="sticky top-0 bg-background border-b border-border z-10">
             <tr>
