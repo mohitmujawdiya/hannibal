@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -12,9 +11,6 @@ import {
   Swords,
   Search,
   Settings,
-  Plus,
-  ChevronDown,
-  Folder,
   PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +21,7 @@ import {
   type ViewType,
   useWorkspaceContext,
 } from "@/stores/workspace-context";
+import { ProjectSwitcher } from "./project-switcher";
 
 type SidebarProps = {
   projectId: string;
@@ -44,17 +41,10 @@ const viewItems: { id: ViewType; label: string; icon: React.ElementType }[] = [
   { id: "research", label: "Research", icon: Search },
 ];
 
-const demoProjects = [
-  { id: "demo-1", name: "Fitness App" },
-  { id: "demo-2", name: "SaaS Dashboard" },
-  { id: "demo-3", name: "E-commerce Revamp" },
-];
-
 export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
   const activeView = useWorkspaceContext((s) => s.activeView);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
   const toggleSidebar = useWorkspaceContext((s) => s.toggleSidebar);
-  const [projectsExpanded, setProjectsExpanded] = useState(true);
 
   if (collapsed) {
     return (
@@ -69,6 +59,12 @@ export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
             H
           </button>
         </div>
+
+        {/* Project switcher */}
+        <div className="flex items-center justify-center py-2">
+          <ProjectSwitcher projectId={projectId} collapsed />
+        </div>
+        <Separator className="w-10" />
 
         {/* View icons */}
         <div className="flex-1 flex flex-col items-center gap-1 py-2.5">
@@ -118,53 +114,18 @@ export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
         </button>
       </div>
 
+      {/* Project switcher */}
+      <div className="px-3 py-3">
+        <ProjectSwitcher projectId={projectId} />
+      </div>
+
       <ScrollArea className="flex-1 px-2">
-        {/* Projects */}
-        <div className="mb-1">
-          <button
-            onClick={() => setProjectsExpanded(!projectsExpanded)}
-            className="flex w-full items-center gap-1 px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronDown
-              className={cn(
-                "h-3 w-3 transition-transform",
-                !projectsExpanded && "-rotate-90"
-              )}
-            />
-            Projects
-          </button>
-          {projectsExpanded && (
-            <div className="space-y-0.5">
-              {demoProjects.map((project) => (
-                <button
-                  key={project.id}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                    project.id === projectId
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                  )}
-                >
-                  <Folder className="h-3.5 w-3.5" />
-                  {project.name}
-                </button>
-              ))}
-              <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                <Plus className="h-3 w-3" />
-                New project
-              </button>
-            </div>
-          )}
-        </div>
-
-        <Separator className="my-2" />
-
         {/* Views */}
-        <div className="mb-1">
-          <span className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+        <div className="mb-1 pt-1">
+          <span className="px-2 pb-2 text-sm font-medium text-muted-foreground">
             Views
           </span>
-          <div className="mt-1 space-y-0.5">
+          <div className="mt-2 space-y-0.5">
             {viewItems.map((item) => {
               const Icon = item.icon;
               return (
