@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
@@ -592,9 +591,9 @@ function TreeNode({
                 )}
               </div>
               {hasChildren && (
-                <Badge variant="outline" className="text-[10px] shrink-0">
-                  {node.children!.length}
-                </Badge>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  ({node.children!.length})
+                </span>
               )}
               <div className="flex items-center gap-1 shrink-0">
                 {onAddChild && (

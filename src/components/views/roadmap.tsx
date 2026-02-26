@@ -20,13 +20,15 @@ import type {
 
 export function RoadmapView({ projectId }: { projectId: string }) {
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
-  const toggleAiPanel = useWorkspaceContext((s) => s.toggleAiPanel);
+  const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
+  const setSelectedEntity = useWorkspaceContext((s) => s.setSelectedEntity);
   const roadmaps = useRoadmaps();
   const updateArtifact = useArtifactStore((s) => s.updateArtifact);
 
   useEffect(() => {
     setActiveView("roadmap");
-  }, [setActiveView]);
+    return () => setSelectedEntity(null);
+  }, [setActiveView, setSelectedEntity]);
 
   const roadmap = roadmaps.length > 0 ? roadmaps[roadmaps.length - 1] : null;
 
@@ -75,14 +77,31 @@ export function RoadmapView({ projectId }: { projectId: string }) {
   );
 
   const handleItemClick = useCallback((item: RoadmapItem) => {
+    setSelectedEntity({
+      type: "roadmapItem",
+      id: item.id,
+      data: {
+        title: item.title,
+        description: item.description,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        status: item.status,
+        type: item.type,
+      },
+    });
     setEditingItem(item);
     setItemDialogOpen(true);
-  }, []);
+  }, [setSelectedEntity]);
 
   const handleAddItem = useCallback(() => {
     setEditingItem(null);
     setItemDialogOpen(true);
   }, []);
+
+  const handleDialogClose = useCallback((open: boolean) => {
+    setItemDialogOpen(open);
+    if (!open) setSelectedEntity(null);
+  }, [setSelectedEntity]);
 
   const handleSaveItem = useCallback(
     (item: RoadmapItem) => {
@@ -132,7 +151,7 @@ export function RoadmapView({ projectId }: { projectId: string }) {
               Plan your timeline with swim lanes, milestones, and feature bars.
               Ask the AI to generate a roadmap, or create one manually.
             </p>
-            <Button variant="outline" size="sm" onClick={toggleAiPanel}>
+            <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
               <PanelRight className="h-3.5 w-3.5 mr-1.5" />
               Open AI Panel
             </Button>
@@ -166,7 +185,7 @@ export function RoadmapView({ projectId }: { projectId: string }) {
 
       <RoadmapItemDialog
         open={itemDialogOpen}
-        onOpenChange={setItemDialogOpen}
+        onOpenChange={handleDialogClose}
         item={editingItem}
         lanes={roadmap.lanes}
         onSave={handleSaveItem}

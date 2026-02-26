@@ -17,7 +17,7 @@ export function buildSystemPrompt({
   artifacts?: StoredArtifact[];
 }): string {
   const viewContextMap: Record<ViewType, string> = {
-    overview: "The PM is on the project overview. Help them get started by understanding their problem space, or guide them to the right view.",
+    overview: "The PM is viewing the project dashboard showing: artifact coverage (which deliverables exist), features needing RICE scores, incomplete personas/competitors, top-priority features by RICE score, recent AI-generated artifacts, and upcoming/overdue roadmap items. Help them understand project health, suggest what to focus on next, or summarize project status.",
     plan: "The PM is working on the implementation plan. Help them refine problem statements, define target users, propose solutions, identify risks, and set success metrics.",
     prd: "The PM is editing a Product Requirements Document. Help with user stories, acceptance criteria, technical constraints, scoping, and making requirements specific and testable.",
     features: "The PM is building the feature tree. Help them decompose features hierarchically, identify gaps, suggest sub-features, and ensure completeness.",

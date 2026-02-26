@@ -11,7 +11,6 @@ import {
   List,
   Layers,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { cn } from "@/lib/utils";
@@ -164,7 +163,7 @@ function ScoreCell({
           const v = e.target.value ? Number(e.target.value) : undefined;
           onChange(v);
         }}
-        className="h-8 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-8 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <option value="">—</option>
         {IMPACT_OPTIONS.map((o) => (
@@ -184,7 +183,7 @@ function ScoreCell({
           const v = e.target.value ? Number(e.target.value) : undefined;
           onChange(v);
         }}
-        className="h-8 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        className="h-8 w-auto min-w-full rounded border border-input bg-transparent px-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <option value="">—</option>
         {CONFIDENCE_OPTIONS.map((o) => (
@@ -204,7 +203,7 @@ function ScoreCell({
           setEditing(true);
         }}
         className={cn(
-          "h-7 w-full rounded border border-transparent px-1.5 text-xs text-left hover:border-input transition-colors",
+          "h-7 w-full rounded border border-transparent px-1.5 text-sm text-left hover:border-input transition-colors",
           value == null && "text-muted-foreground",
         )}
       >
@@ -238,7 +237,7 @@ function ScoreCell({
       min={type === "reach" ? 1 : 0.5}
       max={type === "reach" ? 10 : undefined}
       step={type === "reach" ? 1 : 0.5}
-      className="h-8 w-full rounded border border-input bg-transparent px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+      className="h-8 w-full rounded border border-input bg-transparent px-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
       autoFocus
     />
   );
@@ -250,7 +249,7 @@ function DerivedScore({ node }: { node: FeatureNode }) {
   return (
     <span
       className={cn(
-        "text-xs tabular-nums",
+        "text-sm tabular-nums",
         best >= 5
           ? "text-green-400/60"
           : best >= 2
@@ -287,7 +286,7 @@ function SortHeader({
       onClick={() => onSort(sortKey)}
       title={tooltip}
       className={cn(
-        "flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors",
+        "flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors",
         active && "text-foreground",
         className,
       )}
@@ -326,11 +325,11 @@ function FeatureRow({
       className={cn(
         "border-b border-border/50 transition-colors",
         isGroup
-          ? "bg-muted/10 hover:bg-muted/20"
+          ? "bg-muted/30 hover:bg-muted/40"
           : "hover:bg-muted/30",
       )}
     >
-      <td className="px-4 py-2">
+      <td className="px-4 py-3">
         <div
           className="flex items-center gap-1.5"
           style={{ paddingLeft: indent }}
@@ -338,40 +337,35 @@ function FeatureRow({
           <div className="min-w-0">
             <div
               className={cn(
-                "text-sm truncate",
-                isGroup ? "font-semibold text-muted-foreground" : "font-medium",
+                "truncate",
+                isGroup ? "text-sm font-semibold text-muted-foreground" : "text-sm font-medium",
               )}
             >
               {f.node.title}
             </div>
             {f.parentTitles.length > 0 && (
-              <div className="text-[10px] text-muted-foreground truncate">
+              <div className="text-xs text-muted-foreground truncate">
                 {f.parentTitles.join(" › ")}
               </div>
             )}
           </div>
-          {isGroup && (
-            <Badge variant="outline" className="text-[9px] shrink-0 ml-1">
-              group
-            </Badge>
-          )}
         </div>
       </td>
 
       {isGroup ? (
         <>
-          <td className="px-2 py-2" colSpan={4}>
-            <span className="text-[10px] text-muted-foreground italic">
+          <td className="px-2 py-3" colSpan={4}>
+            <span className="text-xs text-muted-foreground italic">
               scores apply to leaf features only
             </span>
           </td>
-          <td className="px-4 py-2 text-right">
+          <td className="px-4 py-3 text-right">
             <DerivedScore node={f.node} />
           </td>
         </>
       ) : (
         <>
-          <td className="px-2 py-2">
+          <td className="px-2 py-3">
             <ScoreCell
               value={f.node.reach}
               placeholder="—"
@@ -379,7 +373,7 @@ function FeatureRow({
               onChange={(v) => onScoreUpdate(f.path, "reach", v)}
             />
           </td>
-          <td className="px-2 py-2 whitespace-nowrap">
+          <td className="px-2 py-3 whitespace-nowrap">
             <ScoreCell
               value={f.node.impact}
               placeholder="—"
@@ -387,7 +381,7 @@ function FeatureRow({
               onChange={(v) => onScoreUpdate(f.path, "impact", v)}
             />
           </td>
-          <td className="px-2 py-2 whitespace-nowrap">
+          <td className="px-2 py-3 whitespace-nowrap">
             <ScoreCell
               value={f.node.confidence}
               placeholder="—"
@@ -395,7 +389,7 @@ function FeatureRow({
               onChange={(v) => onScoreUpdate(f.path, "confidence", v)}
             />
           </td>
-          <td className="px-2 py-2">
+          <td className="px-2 py-3">
             <ScoreCell
               value={f.node.effort}
               placeholder="—"
@@ -403,7 +397,7 @@ function FeatureRow({
               onChange={(v) => onScoreUpdate(f.path, "effort", v)}
             />
           </td>
-          <td className="px-4 py-2 text-right">
+          <td className="px-4 py-3 text-right">
             {score != null ? (
               <span
                 className={cn(
@@ -548,10 +542,11 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
       </div>
 
       <div className="flex-1 overflow-auto px-4 py-5">
+        <div className="rounded-lg border border-border/50 overflow-hidden">
         <table className="w-full text-sm table-auto">
-          <thead className="sticky top-0 bg-background border-b border-border z-10">
+          <thead className="sticky top-0 bg-muted/80 border-b border-border/50 z-10">
             <tr>
-              <th className="text-left px-4 py-2.5 w-full">
+              <th className="text-left px-4 py-3.5 w-full">
                 <SortHeader
                   label="Feature"
                   sortKey="feature"
@@ -560,7 +555,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   onSort={handleSort}
                 />
               </th>
-              <th className="text-left px-2 py-2.5 whitespace-nowrap">
+              <th className="text-left px-2 py-3.5 whitespace-nowrap">
                 <SortHeader
                   label="Reach"
                   sortKey="reach"
@@ -570,7 +565,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   tooltip="How many users will this affect? (1-10)"
                 />
               </th>
-              <th className="text-left px-2 py-2.5 whitespace-nowrap">
+              <th className="text-left px-2 py-3.5 whitespace-nowrap">
                 <SortHeader
                   label="Impact"
                   sortKey="impact"
@@ -580,7 +575,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   tooltip="How much will this move the needle? (Minimal 0.25 → Massive 3)"
                 />
               </th>
-              <th className="text-left px-2 py-2.5 whitespace-nowrap">
+              <th className="text-left px-2 py-3.5 whitespace-nowrap">
                 <SortHeader
                   label="Confidence"
                   sortKey="confidence"
@@ -590,7 +585,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   tooltip="How sure are you about these estimates? (50% / 80% / 100%)"
                 />
               </th>
-              <th className="text-left px-2 py-2.5 whitespace-nowrap">
+              <th className="text-left px-2 py-3.5 whitespace-nowrap">
                 <SortHeader
                   label="Effort"
                   sortKey="effort"
@@ -600,7 +595,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
                   tooltip="Estimated effort in person-weeks (0.5+)"
                 />
               </th>
-              <th className="text-right px-4 py-2.5 whitespace-nowrap">
+              <th className="text-right px-4 py-3.5 whitespace-nowrap">
                 <SortHeader
                   label="RICE Score"
                   sortKey="score"
@@ -634,6 +629,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
