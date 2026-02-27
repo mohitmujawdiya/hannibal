@@ -2,14 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Folder, ChevronDown, Plus, Check } from "lucide-react";
+import { Folder, ChevronDown, Plus, Check, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -34,6 +44,10 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<{ id: string; name: string } | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingProject, setDeletingProject] = useState<{ id: string; name: string } | null>(null);
 
   const utils = trpc.useUtils();
   const { data: projects } = trpc.project.list.useQuery();
@@ -45,6 +59,28 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
       setNewProjectName("");
     },
   });
+  const updateMutation = trpc.project.update.useMutation({
+    onSuccess: () => {
+      utils.project.list.invalidate();
+      setEditDialogOpen(false);
+      setEditingProject(null);
+      toast.success("Project renamed");
+    },
+  });
+  const deleteMutation = trpc.project.delete.useMutation({
+    onSuccess: (_data, variables) => {
+      utils.project.list.invalidate();
+      toast.success("Project deleted");
+      if (variables.id === projectId) {
+        const remaining = projects?.filter((p) => p.id !== variables.id);
+        if (remaining && remaining.length > 0) {
+          router.push(`/${remaining[0].id}`);
+        } else {
+          router.push("/");
+        }
+      }
+    },
+  });
 
   const currentProject = projects?.find((p) => p.id === projectId);
 
@@ -52,6 +88,25 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
     const trimmed = newProjectName.trim();
     if (!trimmed) return;
     createMutation.mutate({ name: trimmed });
+  };
+
+  const handleRename = () => {
+    if (!editingProject) return;
+    const trimmed = editingProject.name.trim();
+    if (!trimmed) return;
+    updateMutation.mutate({ id: editingProject.id, name: trimmed });
+  };
+
+  const handleDelete = (project: { id: string; name: string }) => {
+    setDeletingProject(project);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deletingProject) return;
+    deleteMutation.mutate({ id: deletingProject.id });
+    setDeleteDialogOpen(false);
+    setDeletingProject(null);
   };
 
   return (
@@ -85,17 +140,44 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
           <DropdownMenuLabel>Projects</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {projects?.map((project) => (
-            <DropdownMenuCheckboxItem
+            <DropdownMenuItem
               key={project.id}
-              checked={project.id === projectId}
+              className="group flex items-center gap-2 pr-1"
               onSelect={() => {
                 if (project.id !== projectId) {
                   router.push(`/${project.id}`);
                 }
               }}
             >
-              {project.name}
-            </DropdownMenuCheckboxItem>
+              <Check
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  project.id === projectId ? "opacity-100" : "opacity-0"
+                )}
+              />
+              <span className="flex-1 truncate">{project.name}</span>
+              <button
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-accent transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingProject({ id: project.id, name: project.name });
+                  setEditDialogOpen(true);
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+              {(projects?.length ?? 0) > 1 && (
+                <button
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete({ id: project.id, name: project.name });
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </button>
+              )}
+            </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setDialogOpen(true)}>
@@ -135,6 +217,71 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
               disabled={!newProjectName.trim() || createMutation.isPending}
             >
               {createMutation.isPending ? "Creating..." : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+        setDeleteDialogOpen(open);
+        if (!open) setDeletingProject(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete &ldquo;{deletingProject?.name}&rdquo;. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={(open) => {
+        setEditDialogOpen(open);
+        if (!open) setEditingProject(null);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rename Project</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-project-name">Project name</Label>
+              <Input
+                id="edit-project-name"
+                value={editingProject?.name ?? ""}
+                onChange={(e) =>
+                  setEditingProject((prev) =>
+                    prev ? { ...prev, name: e.target.value } : prev
+                  )
+                }
+                placeholder="e.g. Fitness App"
+                maxLength={200}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRename();
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRename}
+              disabled={!editingProject?.name.trim() || updateMutation.isPending}
+            >
+              {updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

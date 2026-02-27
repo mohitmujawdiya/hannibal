@@ -41,5 +41,13 @@ export function useDebouncedMutation<TInput>(
     [mutationFn, delayMs],
   );
 
-  return { debouncedFn, savingState };
+  const cancel = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    latestRef.current = null;
+  }, []);
+
+  return { debouncedFn, cancel, savingState };
 }
