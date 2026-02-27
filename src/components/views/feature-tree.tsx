@@ -452,15 +452,15 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-muted-foreground hover:text-destructive"
+            className="h-8 text-destructive hover:text-destructive"
             onClick={() => {
               if (window.confirm("Delete the entire feature tree? This cannot be undone.")) {
                 removeAll();
               }
             }}
-            title="Delete tree"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Delete
           </Button>
         </div>
       </div>
