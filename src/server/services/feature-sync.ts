@@ -49,6 +49,7 @@ export async function syncFeatureTree(
     riceEffort?: number | null;
     riceScore?: number | null;
     parentId: string | null;
+    parentTempKey: string | null;
     order: number;
   }> = [];
 
@@ -117,14 +118,15 @@ export async function syncFeatureTree(
         riceConfidence: node.confidence ?? null,
         riceEffort: node.effort ?? null,
         riceScore: score,
-        parentId, // will be resolved after parent is created
+        parentId,
+        parentTempKey,
         order,
       });
 
       // Process children — they'll reference this temp key
       if (node.children) {
         node.children.forEach((child, i) => {
-          walkNode(child, null, i, tempKey); // parentId resolved later
+          walkNode(child, null, i, tempKey);
         });
       }
       return null;
@@ -158,7 +160,9 @@ export async function syncFeatureTree(
 
     // Create new features (in order so parents are created before children)
     for (const create of creates) {
-      const resolvedParentId = create.parentId ?? null;
+      const resolvedParentId =
+        create.parentId ??
+        (create.parentTempKey ? tempKeyToId.get(create.parentTempKey) ?? null : null);
       const created = await tx.feature.create({
         data: {
           title: create.title,
