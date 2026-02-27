@@ -9,6 +9,7 @@ import {
 import { Sidebar } from "./sidebar";
 import { MainContent } from "./main-content";
 import { AiPanel } from "./ai-panel";
+import { WorkspaceSkeleton } from "./workspace-skeleton";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 
 type WorkspaceShellProps = {
@@ -44,11 +45,7 @@ export function WorkspaceShell({ projectId, projectName }: WorkspaceShellProps) 
 
   // Defer ResizablePanelGroup until after hydration to avoid id/data-testid mismatch
   if (!mounted) {
-    return (
-      <div className="flex h-screen w-screen overflow-hidden bg-background">
-        <div className="flex flex-1 min-w-0" />
-      </div>
-    );
+    return <WorkspaceSkeleton />;
   }
 
   return (
