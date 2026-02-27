@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useFeatureTrees } from "@/stores/artifact-store";
+import { useProjectFeatureTree } from "@/hooks/use-project-data";
 import { flattenTree, computeRiceScore } from "@/lib/rice-scoring";
 import { generateId } from "@/lib/roadmap-utils";
 import { format, addDays } from "date-fns";
@@ -23,6 +23,7 @@ type ImportFeaturesDialogProps = {
   lanes: RoadmapLane[];
   existingItems: RoadmapItem[];
   onImport: (items: RoadmapItem[]) => void;
+  projectId: string;
 };
 
 export function ImportFeaturesDialog({
@@ -31,9 +32,9 @@ export function ImportFeaturesDialog({
   lanes,
   existingItems,
   onImport,
+  projectId,
 }: ImportFeaturesDialogProps) {
-  const trees = useFeatureTrees();
-  const tree = trees.length > 0 ? trees[trees.length - 1] : null;
+  const { tree } = useProjectFeatureTree(projectId);
 
   const flatFeatures = useMemo(() => {
     if (!tree) return [];

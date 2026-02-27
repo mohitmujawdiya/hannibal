@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   Sparkles,
@@ -15,7 +15,9 @@ import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore, useFeatureTrees } from "@/stores/artifact-store";
+import { useProjectFeatureTree } from "@/hooks/use-project-data";
+import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { FeatureNode } from "@/lib/artifact-types";
 import {
   flattenTree,
@@ -25,7 +27,7 @@ import {
   CONFIDENCE_OPTIONS,
   type FlatFeature,
 } from "@/lib/rice-scoring";
-import { prioritiesToMarkdown, featureTreeToContentMarkdown } from "@/lib/artifact-to-markdown";
+import { prioritiesToMarkdown } from "@/lib/artifact-to-markdown";
 
 function updateNodeAtPath(
   children: FeatureNode[],
@@ -422,8 +424,7 @@ function FeatureRow({
 }
 
 export function PriorityMatrixView({ projectId }: { projectId: string }) {
-  const trees = useFeatureTrees();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { tree: dbTree, isLoading, syncTree } = useProjectFeatureTree(projectId);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
 
@@ -435,7 +436,19 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
     useWorkspaceContext.getState().setActiveView("priorities");
   }, []);
 
-  const tree = trees.length > 0 ? trees[trees.length - 1] : null;
+  // Local state for responsive RICE score editing
+  const [localChildren, setLocalChildren] = useState<FeatureNode[] | null>(null);
+  const hasPendingEdits = useRef(false);
+
+  useEffect(() => {
+    if (dbTree && !hasPendingEdits.current) {
+      setLocalChildren(dbTree.children);
+    }
+  }, [dbTree]);
+
+  const tree = dbTree
+    ? { ...dbTree, children: localChildren ?? dbTree.children }
+    : null;
 
   const allFeatures = useMemo(
     () => (tree ? flattenTree(tree.children) : []),
@@ -468,22 +481,45 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
     [sortKey],
   );
 
+  const syncTreeAsync = useCallback(
+    async (input: { rootFeature: string; children: FeatureNode[] }) => {
+      await syncTree(input);
+      hasPendingEdits.current = false;
+    },
+    [syncTree],
+  );
+  const { debouncedFn: debouncedSync } = useDebouncedMutation(syncTreeAsync, 500);
+
   const handleScoreUpdate = useCallback(
     (path: number[], field: keyof FeatureNode, value: number | undefined) => {
       if (!tree) return;
       const newChildren = updateNodeAtPath(tree.children, path, {
         [field]: value,
       });
-      const content = featureTreeToContentMarkdown(tree.rootFeature, newChildren);
-      updateArtifact(tree.id, { children: newChildren, content });
+      hasPendingEdits.current = true;
+      setLocalChildren(newChildren);
+      debouncedSync({ rootFeature: tree.rootFeature, children: newChildren });
     },
-    [tree, updateArtifact],
+    [tree, debouncedSync],
   );
 
   const getCopyText = useCallback(() => {
     if (!tree) return "";
     return prioritiesToMarkdown(tree);
   }, [tree]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Priorities</h2>
+        </div>
+        <div className="flex-1 p-6">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   if (!tree) {
     return (

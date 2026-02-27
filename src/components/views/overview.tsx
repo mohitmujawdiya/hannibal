@@ -11,7 +11,6 @@ import {
   Swords,
   Search,
   ArrowRight,
-  CheckCircle2,
 } from "lucide-react";
 import {
   Card,
@@ -20,7 +19,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { useWorkspaceContext, type ViewType } from "@/stores/workspace-context";
-import { useArtifactStore } from "@/stores/artifact-store";
 import { useDashboardData } from "./dashboard/use-dashboard-data";
 import { ProjectHealth } from "./dashboard/project-health";
 import { AttentionNeeded } from "./dashboard/attention-needed";
@@ -135,8 +133,8 @@ function OnboardingCards({
   );
 }
 
-function Dashboard({ onNavigate }: { onNavigate: (view: ViewType) => void }) {
-  const data = useDashboardData();
+function Dashboard({ projectId, onNavigate }: { projectId: string; onNavigate: (view: ViewType) => void }) {
+  const data = useDashboardData(projectId);
 
   return (
     <div className="max-w-5xl mx-auto space-y-4">
@@ -179,7 +177,7 @@ function Dashboard({ onNavigate }: { onNavigate: (view: ViewType) => void }) {
 
 export function OverviewView({ projectId }: { projectId: string }) {
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
-  const artifacts = useArtifactStore((s) => s.artifacts);
+  const data = useDashboardData(projectId);
 
   useEffect(() => {
     useWorkspaceContext.getState().setActiveView("overview");
@@ -192,19 +190,17 @@ export function OverviewView({ projectId }: { projectId: string }) {
     [setActiveView],
   );
 
-  const hasArtifacts = artifacts.length > 0;
-
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-6 h-12 flex items-center">
         <h2 className="text-base font-semibold">
-          {hasArtifacts ? "Dashboard" : "Overview"}
+          {data.hasArtifacts ? "Dashboard" : "Overview"}
         </h2>
       </div>
 
       <div className="flex-1 overflow-auto p-8">
-        {hasArtifacts ? (
-          <Dashboard onNavigate={handleNavigate} />
+        {data.hasArtifacts ? (
+          <Dashboard projectId={projectId} onNavigate={handleNavigate} />
         ) : (
           <OnboardingCards onNavigate={handleNavigate} />
         )}

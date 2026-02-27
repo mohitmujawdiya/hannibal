@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   ClipboardList,
   Sparkles,
   Trash2,
   FileText,
   LayoutGrid,
+  Loader2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,21 +16,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore, usePrds, softDeleteArtifact } from "@/stores/artifact-store";
+import { useProjectPrds } from "@/hooks/use-project-data";
+import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
 import { MarkdownDoc } from "@/components/editor/markdown-doc";
-import { prdToMarkdown } from "@/lib/artifact-to-markdown";
 import { parseMarkdownSections } from "@/lib/parse-markdown-sections";
-import type { PrdArtifact } from "@/lib/artifact-types";
-
-function getPrdContent(prd: PrdArtifact): string {
-  if (prd.content != null && prd.content.trim()) return prd.content;
-  if (prd.sections) return prdToMarkdown(prd);
-  return "";
-}
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function PrdEditorView({ projectId }: { projectId: string }) {
-  const prds = usePrds();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { data: prds, isLoading, update, remove } = useProjectPrds(projectId);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const [viewMode, setViewMode] = useState<"card" | "markdown">("card");
@@ -38,12 +32,27 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
     useWorkspaceContext.getState().setActiveView("prd");
   }, []);
 
-  const prd = prds.length > 0 ? prds[prds.length - 1] : null;
-  useEffect(() => {
-    if (!prd?.sections || (prd.content != null && prd.content.trim())) return;
-    const content = prdToMarkdown(prd);
-    updateArtifact(prd.id, { content, sections: undefined } as Partial<PrdArtifact>);
-  }, [prd?.id, prd?.sections, prd?.content, updateArtifact]);
+  const updateContent = useCallback(
+    async (input: { id: string; content: string }) => {
+      await update(input);
+    },
+    [update],
+  );
+  const { debouncedFn: debouncedUpdate, savingState } = useDebouncedMutation(updateContent);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Product Requirements</h2>
+        </div>
+        <div className="flex-1 p-6 space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   if (prds.length === 0) {
     return (
@@ -70,13 +79,17 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
     );
   }
 
-  const activePrd = prd!;
-  const content = getPrdContent(activePrd);
+  const activePrd = prds[0]; // list is ordered by updatedAt desc
+  const content = activePrd.content;
 
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-6 h-12 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Product Requirements</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold">Product Requirements</h2>
+          {savingState === "saving" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+          {savingState === "saved" && <span className="text-xs text-muted-foreground">Saved</span>}
+        </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-md border border-border">
             <Button
@@ -101,7 +114,7 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
             variant="ghost"
             size="sm"
             className="h-8 text-destructive hover:text-destructive"
-            onClick={() => softDeleteArtifact(activePrd.id)}
+            onClick={() => remove(activePrd.id)}
           >
             <Trash2 className="h-3.5 w-3.5 mr-1" />
             Delete
@@ -114,7 +127,7 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
           <div className="max-w-3xl mx-auto">
             <MarkdownDoc
               value={content}
-              onChange={(v) => updateArtifact(activePrd.id, { content: v } as Partial<PrdArtifact>)}
+              onChange={(v) => debouncedUpdate({ id: activePrd.id, content: v })}
               placeholder="Product requirements..."
               minHeight="min-h-[400px]"
             />

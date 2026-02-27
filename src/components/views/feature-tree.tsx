@@ -22,6 +22,7 @@ import {
   Plus,
   Undo2,
   Redo2,
+  Loader2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -31,9 +32,11 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore, useFeatureTrees, softDeleteArtifact } from "@/stores/artifact-store";
-import { featureTreeToMarkdown, featureTreeToContentMarkdown } from "@/lib/artifact-to-markdown";
+import { useProjectFeatureTree } from "@/hooks/use-project-data";
+import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
+import { featureTreeToMarkdown } from "@/lib/artifact-to-markdown";
 import type { FeatureNode, FeatureTreeArtifact } from "@/lib/artifact-types";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getLayoutedElements } from "@/lib/feature-tree-to-flow";
 import { FeatureFlowNode } from "./feature-flow-node";
 import "@xyflow/react/dist/style.css";
@@ -140,26 +143,53 @@ function useUndoRedo<T>(maxHistory = 50) {
 }
 
 function FeatureTreeContent({ projectId }: { projectId: string }) {
-  const trees = useFeatureTrees();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { tree: dbTree, isLoading, syncTree } = useProjectFeatureTree(projectId);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const [viewMode, setViewMode] = useState<"flow" | "list">("flow");
 
-  const tree = trees.length > 0 ? trees[trees.length - 1] : null;
+  // Local tree state for responsive editing
+  const [localRoot, setLocalRoot] = useState<string | null>(null);
+  const [localChildren, setLocalChildren] = useState<FeatureNode[] | null>(null);
+  const hasPendingEdits = useRef(false);
+
+  // Sync from DB on load and when data changes externally
+  useEffect(() => {
+    if (dbTree && !hasPendingEdits.current) {
+      setLocalRoot(dbTree.rootFeature);
+      setLocalChildren(dbTree.children);
+    }
+  }, [dbTree]);
+
+  const tree: FeatureTreeArtifact | null =
+    localRoot != null && localChildren != null
+      ? { type: "featureTree", rootFeature: localRoot, children: localChildren }
+      : dbTree;
   const children = tree?.children ?? [];
 
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo<FeatureNode[]>();
+
+  // Debounced sync to DB
+  const syncTreeAsync = useCallback(
+    async (input: { rootFeature: string; children: FeatureNode[] }) => {
+      await syncTree(input);
+      hasPendingEdits.current = false;
+    },
+    [syncTree],
+  );
+  const { debouncedFn: debouncedSync, savingState } = useDebouncedMutation(syncTreeAsync, 500);
 
   const updateTree = useCallback(
     (updates: Partial<FeatureTreeArtifact>) => {
       if (!tree) return;
       const root = updates.rootFeature ?? tree.rootFeature;
       const kids = updates.children ?? tree.children;
-      const content = featureTreeToContentMarkdown(root, kids);
-      updateArtifact(tree.id, { ...updates, content });
+      hasPendingEdits.current = true;
+      setLocalRoot(root);
+      setLocalChildren(kids);
+      debouncedSync({ rootFeature: root, children: kids });
     },
-    [tree, updateArtifact],
+    [tree, debouncedSync],
   );
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
@@ -187,9 +217,6 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
   }, [tree, setNodes, setEdges]);
 
   const getCopyText = () => tree ? featureTreeToMarkdown(tree) : "";
-  const handleDelete = () => {
-    if (tree) softDeleteArtifact(tree.id);
-  };
 
   const handleAddChild = useCallback(
     (nodeId: string) => {
@@ -325,7 +352,20 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
     [nodes, handleUpdate],
   );
 
-  if (trees.length === 0) {
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Feature Tree</h2>
+        </div>
+        <div className="flex-1 p-6">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!tree) {
     return (
       <div className="flex h-full flex-col">
         <div className="border-b border-border px-6 h-12 flex items-center">
@@ -350,12 +390,14 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
     );
   }
 
-  const activeTree = tree!;
-
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-6 h-12 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Feature Tree</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold">Feature Tree</h2>
+          {savingState === "saving" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+          {savingState === "saved" && <span className="text-xs text-muted-foreground">Saved</span>}
+        </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-md border border-border overflow-hidden">
             <Button
@@ -404,15 +446,6 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
             </Button>
           </div>
           <CopyButton getText={getCopyText} />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 text-destructive hover:text-destructive"
-            onClick={handleDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1" />
-            Delete
-          </Button>
         </div>
       </div>
 
@@ -443,7 +476,7 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
           <div className="overflow-auto p-6">
             <div className="max-w-3xl mx-auto">
               <div className="space-y-1">
-                {activeTree.children.map((node, i) => (
+                {tree.children.map((node, i) => (
                   <TreeNode
                     key={i}
                     node={node}

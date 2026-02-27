@@ -20,17 +20,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore, usePersonas, softDeleteArtifact } from "@/stores/artifact-store";
-import { personaToMarkdown } from "@/lib/artifact-to-markdown";
+import { useProjectPersonas } from "@/hooks/use-project-data";
 import { parsePersonaMarkdown } from "@/lib/markdown-to-artifact";
 import type { ParsedPersona } from "@/lib/markdown-to-artifact";
-import type { PersonaArtifact } from "@/lib/artifact-types";
-
-function getPersonaContent(persona: PersonaArtifact): string {
-  if (persona.content != null && persona.content.trim()) return persona.content;
-  return personaToMarkdown(persona);
-}
 
 function buildPersonaMarkdown(fields: ParsedPersona): string {
   const parts: string[] = [
@@ -66,8 +60,7 @@ function listToLines(items: string[]): string {
 }
 
 export function PersonaCardsView({ projectId }: { projectId: string }) {
-  const personas = usePersonas();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { data: personas, isLoading, update, remove } = useProjectPersonas(projectId);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -75,6 +68,22 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
   useEffect(() => {
     useWorkspaceContext.getState().setActiveView("personas");
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">User Personas</h2>
+        </div>
+        <div className="flex-1 p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto">
+            <Skeleton className="h-64" />
+            <Skeleton className="h-64" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (personas.length === 0) {
     return (
@@ -101,11 +110,11 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
     );
   }
 
-  const getCopyText = () => personas.map((p) => getPersonaContent(p)).join("\n\n---\n\n");
+  const getCopyText = () => personas.map((p) => p.content ?? "").join("\n\n---\n\n");
 
   const handleSave = (personaId: string, fields: ParsedPersona) => {
     const content = buildPersonaMarkdown(fields);
-    updateArtifact(personaId, { content, title: fields.name } as Partial<PersonaArtifact>);
+    update({ id: personaId, name: fields.name, content });
     setEditingId(null);
   };
 
@@ -121,7 +130,7 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
       <div className="flex-1 overflow-auto p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-5xl mx-auto">
             {personas.map((persona) => {
-              const parsed = parsePersonaMarkdown(getPersonaContent(persona));
+              const parsed = parsePersonaMarkdown(persona.content ?? "");
               const isEditing = editingId === persona.id;
 
               if (isEditing) {
@@ -141,7 +150,7 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                   <CardHeader className="pb-0">
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-base">{persona.title || parsed.name}</CardTitle>
+                        <CardTitle className="text-base">{persona.name || parsed.name}</CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {parsed.demographics}
                         </p>
@@ -166,7 +175,7 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                          onClick={() => navigator.clipboard.writeText(getPersonaContent(persona))}
+                          onClick={() => navigator.clipboard.writeText(persona.content ?? "")}
                           aria-label="Copy persona as markdown"
                         >
                           <Copy className="h-3.5 w-3.5" />
@@ -175,7 +184,7 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => softDeleteArtifact(persona.id)}
+                          onClick={() => remove(persona.id)}
                           aria-label="Delete persona"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -250,12 +259,12 @@ function EditPersonaCard({
   onSave,
   onCancel,
 }: {
-  persona: PersonaArtifact;
+  persona: { id: string; name: string; content: string | null };
   parsed: ParsedPersona;
   onSave: (fields: ParsedPersona) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(persona.title || parsed.name);
+  const [name, setName] = useState(persona.name || parsed.name);
   const [demographics, setDemographics] = useState(parsed.demographics);
   const [techProficiency, setTechProficiency] = useState(parsed.techProficiency);
   const [quote, setQuote] = useState(parsed.quote);

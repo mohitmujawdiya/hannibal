@@ -4,6 +4,32 @@ import { FeatureStatus } from "@/generated/prisma/client";
 import { protectedProcedure, router } from "../trpc";
 import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
 import { computeRiceScore } from "../services/artifact";
+import { syncFeatureTree } from "../services/feature-sync";
+
+// Recursive Zod schema for FeatureNode input (used by syncTree)
+type FeatureNodeInput = {
+  dbId?: string;
+  title: string;
+  description?: string;
+  reach?: number;
+  impact?: number;
+  confidence?: number;
+  effort?: number;
+  children?: FeatureNodeInput[];
+};
+
+const featureNodeSchema: z.ZodType<FeatureNodeInput> = z.lazy(() =>
+  z.object({
+    dbId: z.string().optional(),
+    title: z.string().min(1).max(500),
+    description: z.string().max(5000).optional(),
+    reach: z.number().min(0).optional(),
+    impact: z.number().min(0).optional(),
+    confidence: z.number().min(0).max(100).optional(),
+    effort: z.number().min(0).optional(),
+    children: z.array(featureNodeSchema).optional(),
+  }),
+);
 
 // Recursive include builder for nested feature tree
 function buildChildrenInclude(depth: number): object | undefined {
@@ -175,6 +201,24 @@ export const featureRouter = router({
         where: { id: input.id },
         data: { parentId: input.parentId, order: input.order },
       });
+    }),
+
+  syncTree: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string().cuid(),
+        rootFeature: z.string().min(1).max(500),
+        children: z.array(z.lazy(() => featureNodeSchema)),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
+      return syncFeatureTree(
+        ctx.db,
+        input.projectId,
+        input.rootFeature,
+        input.children,
+      );
     }),
 
   batchUpdateRice: protectedProcedure

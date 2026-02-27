@@ -22,18 +22,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore, useCompetitors, softDeleteArtifact } from "@/stores/artifact-store";
-import { competitorToMarkdown } from "@/lib/artifact-to-markdown";
+import { useProjectCompetitors } from "@/hooks/use-project-data";
 import { parseCompetitorMarkdown } from "@/lib/markdown-to-artifact";
 import type { ParsedCompetitor } from "@/lib/markdown-to-artifact";
-import type { CompetitorArtifact } from "@/lib/artifact-types";
 import { sanitizeUrl } from "@/lib/sanitize-url";
-
-function getCompetitorContent(comp: CompetitorArtifact): string {
-  if (comp.content != null && comp.content.trim()) return comp.content;
-  return competitorToMarkdown(comp);
-}
 
 function buildCompetitorMarkdown(fields: ParsedCompetitor): string {
   const parts: string[] = [
@@ -69,8 +63,7 @@ function listToLines(items: string[]): string {
 }
 
 export function CompetitorMatrixView({ projectId }: { projectId: string }) {
-  const competitors = useCompetitors();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { data: competitors, isLoading, update, remove } = useProjectCompetitors(projectId);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -78,6 +71,22 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
   useEffect(() => {
     useWorkspaceContext.getState().setActiveView("competitors");
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Competitive Analysis</h2>
+        </div>
+        <div className="flex-1 p-6">
+          <div className="max-w-5xl mx-auto space-y-4">
+            <Skeleton className="h-48" />
+            <Skeleton className="h-48" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (competitors.length === 0) {
     return (
@@ -104,11 +113,11 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
     );
   }
 
-  const getCopyText = () => competitors.map((c) => getCompetitorContent(c)).join("\n\n---\n\n");
+  const getCopyText = () => competitors.map((c) => c.content ?? "").join("\n\n---\n\n");
 
   const handleSave = (compId: string, fields: ParsedCompetitor) => {
     const content = buildCompetitorMarkdown(fields);
-    updateArtifact(compId, { content, title: fields.name } as Partial<CompetitorArtifact>);
+    update({ id: compId, name: fields.name, content });
     setEditingId(null);
   };
 
@@ -124,7 +133,7 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
       <div className="flex-1 overflow-auto p-6">
           <div className="max-w-5xl mx-auto space-y-4">
             {competitors.map((comp) => {
-              const parsed = parseCompetitorMarkdown(getCompetitorContent(comp));
+              const parsed = parseCompetitorMarkdown(comp.content ?? "");
               const isEditing = editingId === comp.id;
 
               if (isEditing) {
@@ -145,7 +154,7 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                     <div className="flex items-start justify-between">
                       <div>
                         <CardTitle className="text-base flex items-center gap-2">
-                          {comp.title || parsed.name}
+                          {comp.name || parsed.name}
                           {parsed.url && sanitizeUrl(parsed.url) && (
                             <a
                               href={sanitizeUrl(parsed.url)}
@@ -181,7 +190,7 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                          onClick={() => navigator.clipboard.writeText(getCompetitorContent(comp))}
+                          onClick={() => navigator.clipboard.writeText(comp.content ?? "")}
                           aria-label="Copy competitor as markdown"
                         >
                           <Copy className="h-3.5 w-3.5" />
@@ -190,7 +199,7 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                          onClick={() => softDeleteArtifact(comp.id)}
+                          onClick={() => remove(comp.id)}
                           aria-label="Delete competitor"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -254,12 +263,12 @@ function EditCompetitorCard({
   onSave,
   onCancel,
 }: {
-  comp: CompetitorArtifact;
+  comp: { id: string; name: string; content: string | null };
   parsed: ParsedCompetitor;
   onSave: (fields: ParsedCompetitor) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(comp.title || parsed.name);
+  const [name, setName] = useState(comp.name || parsed.name);
   const [url, setUrl] = useState(parsed.url);
   const [positioning, setPositioning] = useState(parsed.positioning);
   const [pricing, setPricing] = useState(parsed.pricing);

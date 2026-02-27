@@ -1,20 +1,18 @@
 import { useMemo } from "react";
 
 import type { ViewType } from "@/stores/workspace-context";
-import type { StoredArtifact } from "@/stores/artifact-store";
 import {
-  usePlans,
-  usePrds,
-  useFeatureTrees,
-  usePersonas,
-  useCompetitors,
-  useRoadmaps,
-} from "@/stores/artifact-store";
-import { flattenTree, computeRiceScore } from "@/lib/rice-scoring";
+  useProjectPlans,
+  useProjectPrds,
+  useProjectPersonas,
+  useProjectCompetitors,
+  useProjectFeatureTree,
+  useProjectRoadmap,
+} from "@/hooks/use-project-data";
+import { flattenTree } from "@/lib/rice-scoring";
 import {
   parsePersonaMarkdown,
   parseCompetitorMarkdown,
-  parseRoadmapMarkdown,
 } from "@/lib/markdown-to-artifact";
 
 export type ArtifactCoverage = {
@@ -64,32 +62,35 @@ export type DashboardData = {
   overdueItems: RoadmapDeadline[];
   upcomingItems: RoadmapDeadline[];
   hasArtifacts: boolean;
+  isLoading: boolean;
 };
 
-export function useDashboardData(): DashboardData {
-  const plans = usePlans();
-  const prds = usePrds();
-  const trees = useFeatureTrees();
-  const personas = usePersonas();
-  const competitors = useCompetitors();
-  const roadmaps = useRoadmaps();
+export function useDashboardData(projectId: string): DashboardData {
+  const { data: plans, isLoading: plansLoading } = useProjectPlans(projectId);
+  const { data: prds, isLoading: prdsLoading } = useProjectPrds(projectId);
+  const { data: personas, isLoading: personasLoading } = useProjectPersonas(projectId);
+  const { data: competitors, isLoading: competitorsLoading } = useProjectCompetitors(projectId);
+  const { tree, isLoading: treeLoading } = useProjectFeatureTree(projectId);
+  const { roadmap, isLoading: roadmapLoading } = useProjectRoadmap(projectId);
+
+  const isLoading =
+    plansLoading || prdsLoading || personasLoading || competitorsLoading || treeLoading || roadmapLoading;
 
   return useMemo(() => {
     const coverage: ArtifactCoverage = {
       plan: plans.length > 0,
       prd: prds.length > 0,
-      featureTree: trees.length > 0,
+      featureTree: tree != null,
       personas: personas.length > 0,
       competitors: competitors.length > 0,
-      roadmap: roadmaps.length > 0,
+      roadmap: roadmap != null,
     };
 
     const coverageCount = Object.values(coverage).filter(Boolean).length;
     const coverageTotal = Object.keys(coverage).length;
 
     // Feature scoring
-    const lastTree = trees.length > 0 ? trees[trees.length - 1] : null;
-    const flatFeatures = lastTree ? flattenTree(lastTree.children) : [];
+    const flatFeatures = tree ? flattenTree(tree.children) : [];
     const leaves = flatFeatures.filter((f) => f.isLeaf);
     const featuresScoredCount = leaves.filter(
       (f) => f.riceScore != null,
@@ -110,7 +111,7 @@ export function useDashboardData(): DashboardData {
     }
 
     const thinPlans = plans.filter(
-      (p) => (p.content?.trim().length ?? 0) < 50,
+      (p) => ((p.content as string)?.trim().length ?? 0) < 50,
     );
     if (thinPlans.length > 0) {
       attentionItems.push({
@@ -122,7 +123,7 @@ export function useDashboardData(): DashboardData {
     }
 
     const thinPrds = prds.filter(
-      (p) => (p.content?.trim().length ?? 0) < 50,
+      (p) => ((p.content as string)?.trim().length ?? 0) < 50,
     );
     if (thinPrds.length > 0) {
       attentionItems.push({
@@ -173,33 +174,36 @@ export function useDashboardData(): DashboardData {
       riceScore: f.riceScore!,
     }));
 
-    // Recent artifacts
-    const allArtifacts: StoredArtifact[] = [
-      ...plans,
-      ...prds,
-      ...trees,
-      ...personas,
-      ...competitors,
-      ...roadmaps,
-    ];
+    // Recent artifacts — collect all DB records with createdAt
+    const recentEntries: { id: string; type: string; title: string; createdAt: string }[] = [];
+    for (const p of plans) {
+      recentEntries.push({ id: p.id, type: "plan", title: p.title, createdAt: p.createdAt as unknown as string });
+    }
+    for (const p of prds) {
+      recentEntries.push({ id: p.id, type: "prd", title: p.title, createdAt: p.createdAt as unknown as string });
+    }
+    for (const p of personas) {
+      recentEntries.push({ id: p.id, type: "persona", title: p.name, createdAt: p.createdAt as unknown as string });
+    }
+    for (const c of competitors) {
+      recentEntries.push({ id: c.id, type: "competitor", title: c.name, createdAt: c.createdAt as unknown as string });
+    }
 
-    const recentArtifacts: RecentArtifact[] = allArtifacts
-      .sort((a, b) => b.createdAt - a.createdAt)
+    const recentArtifacts: RecentArtifact[] = recentEntries
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 3)
       .map((a) => ({
         id: a.id,
         type: a.type,
-        title: a.type === "featureTree" ? a.rootFeature : a.title,
-        createdAt: a.createdAt,
+        title: a.title,
+        createdAt: new Date(a.createdAt).getTime(),
       }));
 
     // Roadmap pulse
-    const lastRoadmap =
-      roadmaps.length > 0 ? roadmaps[roadmaps.length - 1] : null;
     let overdueItems: RoadmapDeadline[] = [];
     let upcomingItems: RoadmapDeadline[] = [];
 
-    if (lastRoadmap) {
+    if (roadmap) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const twoWeeksOut = new Date(today);
@@ -208,7 +212,7 @@ export function useDashboardData(): DashboardData {
       const todayStr = today.toISOString().slice(0, 10);
       const twoWeeksStr = twoWeeksOut.toISOString().slice(0, 10);
 
-      for (const item of lastRoadmap.items) {
+      for (const item of roadmap.items) {
         if (item.status === "done") continue;
         if (item.endDate < todayStr) {
           overdueItems.push({
@@ -229,6 +233,14 @@ export function useDashboardData(): DashboardData {
       upcomingItems.sort((a, b) => a.endDate.localeCompare(b.endDate));
     }
 
+    const hasArtifacts =
+      plans.length > 0 ||
+      prds.length > 0 ||
+      personas.length > 0 ||
+      competitors.length > 0 ||
+      tree != null ||
+      roadmap != null;
+
     return {
       coverage,
       coverageCount,
@@ -240,7 +252,8 @@ export function useDashboardData(): DashboardData {
       recentArtifacts,
       overdueItems,
       upcomingItems,
-      hasArtifacts: allArtifacts.length > 0,
+      hasArtifacts,
+      isLoading,
     };
-  }, [plans, prds, trees, personas, competitors, roadmaps]);
+  }, [plans, prds, tree, personas, competitors, roadmap, isLoading]);
 }

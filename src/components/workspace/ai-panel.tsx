@@ -25,15 +25,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore } from "@/stores/artifact-store";
+import { useProjectFeatureTree, useProjectRoadmap } from "@/hooks/use-project-data";
 import { ArtifactCard } from "@/components/ai/artifact-card";
 import { localChatStore } from "@/lib/chat-persistence";
 import { sanitizeUrl } from "@/lib/sanitize-url";
 import type { Artifact, FeatureNode, RoadmapArtifact, RoadmapItem } from "@/lib/artifact-types";
-import { featureTreeToContentMarkdown, roadmapToMarkdown } from "@/lib/artifact-to-markdown";
-import { useRoadmaps } from "@/stores/artifact-store";
+import { artifactToSyncInput } from "@/lib/transforms/roadmap";
 import { generateId } from "@/lib/roadmap-utils";
-import { useFeatureTrees } from "@/stores/artifact-store";
 
 type AiPanelProps = {
   projectId: string;
@@ -52,8 +50,6 @@ export function AiPanel({ projectId }: AiPanelProps) {
   const selectedEntity = useWorkspaceContext((s) => s.selectedEntity);
   const highlightedText = useWorkspaceContext((s) => s.highlightedText);
   const toggleAiPanel = useWorkspaceContext((s) => s.toggleAiPanel);
-  const artifacts = useArtifactStore((s) => s.artifacts);
-
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isAtBottom = useRef(true);
@@ -70,8 +66,8 @@ export function AiPanel({ projectId }: AiPanelProps) {
     },
   ], []);
 
-  const bodyRef = useRef({ activeView, selectedEntity, highlightedText, artifacts, model });
-  bodyRef.current = { activeView, selectedEntity, highlightedText, artifacts, model };
+  const bodyRef = useRef({ activeView, selectedEntity, highlightedText, model });
+  bodyRef.current = { activeView, selectedEntity, highlightedText, model };
 
   const transport = useMemo(
     () =>
@@ -211,7 +207,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
                       }
                       const tool = extractToolInfo(part);
                       if (tool) {
-                        return renderToolPart(tool, i);
+                        return renderToolPart(tool, i, projectId);
                       }
                       return null;
                     })}
@@ -366,7 +362,7 @@ function extractToolInfo(part: unknown): ToolInfo | null {
   return null;
 }
 
-function renderToolPart(tool: ToolInfo, key: number) {
+function renderToolPart(tool: ToolInfo, key: number, projectId: string) {
   const isComplete = tool.state === "output-available";
 
   if (tool.toolName === "webSearch") {
@@ -406,6 +402,7 @@ function renderToolPart(tool: ToolInfo, key: number) {
           <RefinedDescriptionCard
             key={key}
             data={result.refinedDescription}
+            projectId={projectId}
           />
         );
       }
@@ -437,6 +434,7 @@ function renderToolPart(tool: ToolInfo, key: number) {
           <PriorityScoresCard
             key={key}
             scores={result.priorityScores}
+            projectId={projectId}
           />
         );
       }
@@ -463,6 +461,7 @@ function renderToolPart(tool: ToolInfo, key: number) {
           <RoadmapOperationsCard
             key={key}
             operations={result.roadmapOperations}
+            projectId={projectId}
           />
         );
       }
@@ -482,7 +481,7 @@ function renderToolPart(tool: ToolInfo, key: number) {
       if (result.artifact) {
         return (
           <div key={key} className="py-1">
-            <ArtifactCard artifact={result.artifact} />
+            <ArtifactCard artifact={result.artifact} projectId={projectId} />
           </div>
         );
       }
@@ -750,17 +749,16 @@ function applyDescriptionFuzzy(
 
 function RefinedDescriptionCard({
   data,
+  projectId,
 }: {
   data: { featureTitle: string; parentPath: string[]; description: string };
+  projectId: string;
 }) {
   const [applied, setApplied] = useState(false);
-  const trees = useFeatureTrees();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { tree, syncTree } = useProjectFeatureTree(projectId);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
 
-  const tree = trees.length > 0 ? trees[trees.length - 1] : null;
-
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!tree || applied) return;
     // Normalize parentPath — the AI may include rootFeature as the first element
     const normalizedPath =
@@ -783,8 +781,7 @@ function RefinedDescriptionCard({
         data.description,
       );
     }
-    const content = featureTreeToContentMarkdown(tree.rootFeature, newChildren);
-    updateArtifact(tree.id, { children: newChildren, content });
+    await syncTree({ rootFeature: tree.rootFeature, children: newChildren });
     setApplied(true);
   };
 
@@ -822,15 +819,12 @@ function RefinedDescriptionCard({
   );
 }
 
-function PriorityScoresCard({ scores }: { scores: PriorityScore[] }) {
+function PriorityScoresCard({ scores, projectId }: { scores: PriorityScore[]; projectId: string }) {
   const [applied, setApplied] = useState(false);
-  const trees = useFeatureTrees();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { tree, syncTree } = useProjectFeatureTree(projectId);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
 
-  const tree = trees.length > 0 ? trees[trees.length - 1] : null;
-
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!tree || applied) return;
     // Normalize parentPaths — the AI may include rootFeature as the
     // first element, but applyScoresToTree builds paths starting from
@@ -843,8 +837,7 @@ function PriorityScoresCard({ scores }: { scores: PriorityScore[] }) {
           : s.parentPath,
     }));
     const newChildren = applyScoresToTree(tree.children, normalizedScores);
-    const content = featureTreeToContentMarkdown(tree.rootFeature, newChildren);
-    updateArtifact(tree.id, { children: newChildren, content });
+    await syncTree({ rootFeature: tree.rootFeature, children: newChildren });
     setApplied(true);
   };
 
@@ -895,15 +888,12 @@ type RoadmapOp = {
   item: Partial<RoadmapItem> & { title?: string; id?: string };
 };
 
-function RoadmapOperationsCard({ operations }: { operations: RoadmapOp[] }) {
+function RoadmapOperationsCard({ operations, projectId }: { operations: RoadmapOp[]; projectId: string }) {
   const [applied, setApplied] = useState(false);
-  const roadmaps = useRoadmaps();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { roadmap, syncRoadmap } = useProjectRoadmap(projectId);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
 
-  const roadmap = roadmaps.length > 0 ? roadmaps[roadmaps.length - 1] : null;
-
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!roadmap || applied) return;
     let newItems = [...roadmap.items];
 
@@ -933,12 +923,9 @@ function RoadmapOperationsCard({ operations }: { operations: RoadmapOp[] }) {
       }
     }
 
-    const content = roadmapToMarkdown({
-      ...roadmap,
-      items: newItems,
-      content: undefined,
-    } as RoadmapArtifact);
-    updateArtifact(roadmap.id, { items: newItems, content });
+    const merged: RoadmapArtifact & { id: string } = { ...roadmap, items: newItems };
+    const input = artifactToSyncInput(merged);
+    await syncRoadmap({ roadmapId: roadmap.id, ...input });
     setApplied(true);
   };
 

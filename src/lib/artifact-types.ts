@@ -77,6 +77,8 @@ export type FeatureNode = {
   impact?: number;
   confidence?: number;
   effort?: number;
+  /** DB id for stable matching during sync. Populated after first save. */
+  dbId?: string;
 };
 
 export type CompetitorArtifact = {

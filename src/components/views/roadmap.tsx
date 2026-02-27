@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Map, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useRoadmaps, useArtifactStore, softDeleteArtifact } from "@/stores/artifact-store";
+import { useProjectRoadmap } from "@/hooks/use-project-data";
+import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
+import { artifactToSyncInput } from "@/lib/transforms/roadmap";
 import { roadmapToMarkdown } from "@/lib/artifact-to-markdown";
+import { Skeleton } from "@/components/ui/skeleton";
 import { RoadmapToolbar } from "./roadmap/roadmap-toolbar";
 import { RoadmapTimeline } from "./roadmap/roadmap-timeline";
 import { RoadmapItemDialog } from "./roadmap/roadmap-item-dialog";
@@ -23,15 +26,24 @@ export function RoadmapView({ projectId }: { projectId: string }) {
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const setSelectedEntity = useWorkspaceContext((s) => s.setSelectedEntity);
-  const roadmaps = useRoadmaps();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { roadmap: dbRoadmap, isLoading, syncRoadmap, remove } = useProjectRoadmap(projectId);
 
   useEffect(() => {
     setActiveView("roadmap");
     return () => setSelectedEntity(null);
   }, [setActiveView, setSelectedEntity]);
 
-  const roadmap = roadmaps.length > 0 ? roadmaps[roadmaps.length - 1] : null;
+  // Local state for responsive editing
+  const [localRoadmap, setLocalRoadmap] = useState<(RoadmapArtifact & { id: string }) | null>(null);
+  const hasPendingEdits = useRef(false);
+
+  useEffect(() => {
+    if (dbRoadmap && !hasPendingEdits.current) {
+      setLocalRoadmap(dbRoadmap);
+    }
+  }, [dbRoadmap]);
+
+  const roadmap = localRoadmap ?? dbRoadmap;
 
   // Auto-pick the best time scale based on item spread
   const [range, setRange] = useState<Range>(() => {
@@ -45,8 +57,6 @@ export function RoadmapView({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (roadmap) {
       const scale = bestTimeScale(roadmap.items);
-      const content = roadmapToMarkdown({ ...roadmap, timeScale: scale, content: undefined } as RoadmapArtifact);
-      updateArtifact(roadmap.id, { timeScale: scale, content });
       setRange(computeInitialRange(roadmap.items, scale));
     }
     // Only when the roadmap identity changes, not on every item edit
@@ -58,14 +68,25 @@ export function RoadmapView({ projectId }: { projectId: string }) {
   const [editingItem, setEditingItem] = useState<RoadmapItem | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
 
+  const syncAsync = useCallback(
+    async (rm: RoadmapArtifact & { id: string }) => {
+      const input = artifactToSyncInput(rm);
+      await syncRoadmap({ roadmapId: rm.id, ...input });
+      hasPendingEdits.current = false;
+    },
+    [syncRoadmap],
+  );
+  const { debouncedFn: debouncedSync } = useDebouncedMutation(syncAsync, 300);
+
   const handleUpdate = useCallback(
     (partial: Partial<RoadmapArtifact>) => {
       if (!roadmap) return;
-      const merged = { ...roadmap, ...partial };
-      const content = roadmapToMarkdown({ ...merged, content: undefined } as RoadmapArtifact);
-      updateArtifact(roadmap.id, { ...partial, content });
+      const merged: RoadmapArtifact & { id: string } = { ...roadmap, ...partial };
+      hasPendingEdits.current = true;
+      setLocalRoadmap(merged);
+      debouncedSync(merged);
     },
-    [roadmap, updateArtifact],
+    [roadmap, debouncedSync],
   );
 
   const handleTimeScaleChange = useCallback(
@@ -137,6 +158,20 @@ export function RoadmapView({ projectId }: { projectId: string }) {
     return roadmapToMarkdown(roadmap);
   }, [roadmap]);
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Roadmap</h2>
+        </div>
+        <div className="flex-1 p-6">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
   // Empty state
   if (!roadmap) {
     return (
@@ -172,7 +207,7 @@ export function RoadmapView({ projectId }: { projectId: string }) {
         onTimeScaleChange={handleTimeScaleChange}
         onAddItem={handleAddItem}
         onImportFeatures={() => setImportDialogOpen(true)}
-        onDelete={() => softDeleteArtifact(roadmap.id)}
+        onDelete={() => remove(roadmap.id)}
         getMarkdown={getMarkdown}
       />
 
@@ -201,6 +236,7 @@ export function RoadmapView({ projectId }: { projectId: string }) {
         lanes={roadmap.lanes}
         existingItems={roadmap.items}
         onImport={handleImport}
+        projectId={projectId}
       />
     </div>
   );

@@ -8,6 +8,7 @@ import {
 } from "@/generated/prisma/client";
 import { protectedProcedure, router } from "../trpc";
 import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
+import { syncRoadmapFull } from "../services/roadmap-sync";
 
 export const roadmapRouter = router({
   // ─── Roadmap CRUD ───────────────────────────────────────────────────────
@@ -98,6 +99,42 @@ export const roadmapRouter = router({
         where: { id: input.id },
         data: { deletedAt: new Date() },
       });
+    }),
+
+  syncFull: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string().cuid(),
+        roadmapId: z.string().cuid().optional(),
+        title: z.string().min(1).max(500),
+        timeScale: z.nativeEnum(RoadmapTimeScale),
+        lanes: z.array(
+          z.object({
+            clientId: z.string(),
+            name: z.string().min(1).max(200),
+            color: z.string().max(20),
+            order: z.number().int().min(0),
+          }),
+        ),
+        items: z.array(
+          z.object({
+            clientId: z.string(),
+            title: z.string().min(1).max(500),
+            description: z.string().max(5000).optional(),
+            laneClientId: z.string(),
+            startDate: z.string(),
+            endDate: z.string(),
+            status: z.nativeEnum(RoadmapItemStatus),
+            type: z.nativeEnum(RoadmapItemType),
+            color: z.string().max(20).optional(),
+            order: z.number().int().min(0),
+          }),
+        ),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
+      return syncRoadmapFull(ctx.db, input.projectId, input);
     }),
 
   // ─── Lane CRUD ──────────────────────────────────────────────────────────

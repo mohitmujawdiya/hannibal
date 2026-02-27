@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   FileText,
   Sparkles,
   Trash2,
   LayoutGrid,
+  Loader2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -14,21 +15,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
-import { useArtifactStore, usePlans, softDeleteArtifact } from "@/stores/artifact-store";
+import { useProjectPlans } from "@/hooks/use-project-data";
+import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
 import { MarkdownDoc } from "@/components/editor/markdown-doc";
-import { planToMarkdown } from "@/lib/artifact-to-markdown";
 import { parseMarkdownSections } from "@/lib/parse-markdown-sections";
-import type { PlanArtifact } from "@/lib/artifact-types";
-
-function getPlanContent(plan: PlanArtifact): string {
-  if (plan.content != null && plan.content.trim()) return plan.content;
-  if (plan.sections) return planToMarkdown(plan);
-  return "";
-}
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function PlanEditorView({ projectId }: { projectId: string }) {
-  const plans = usePlans();
-  const updateArtifact = useArtifactStore((s) => s.updateArtifact);
+  const { data: plans, isLoading, update, remove } = useProjectPlans(projectId);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const [viewMode, setViewMode] = useState<"card" | "markdown">("card");
@@ -37,12 +31,27 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
     useWorkspaceContext.getState().setActiveView("plan");
   }, []);
 
-  const plan = plans.length > 0 ? plans[plans.length - 1] : null;
-  useEffect(() => {
-    if (!plan?.sections || (plan.content != null && plan.content.trim())) return;
-    const content = planToMarkdown(plan);
-    updateArtifact(plan.id, { content, sections: undefined } as Partial<PlanArtifact>);
-  }, [plan?.id, plan?.sections, plan?.content, updateArtifact]);
+  const updateContent = useCallback(
+    async (input: { id: string; content: string }) => {
+      await update(input);
+    },
+    [update],
+  );
+  const { debouncedFn: debouncedUpdate, savingState } = useDebouncedMutation(updateContent);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Implementation Plan</h2>
+        </div>
+        <div className="flex-1 p-6 space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   if (plans.length === 0) {
     return (
@@ -69,13 +78,17 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
     );
   }
 
-  const activePlan = plan!;
-  const content = getPlanContent(activePlan);
+  const activePlan = plans[0]; // list is ordered by updatedAt desc
+  const content = activePlan.content;
 
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border px-6 h-12 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Implementation Plan</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold">Implementation Plan</h2>
+          {savingState === "saving" && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+          {savingState === "saved" && <span className="text-xs text-muted-foreground">Saved</span>}
+        </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-md border border-border">
             <Button
@@ -100,7 +113,7 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
             variant="ghost"
             size="sm"
             className="h-8 text-destructive hover:text-destructive"
-            onClick={() => softDeleteArtifact(activePlan.id)}
+            onClick={() => remove(activePlan.id)}
           >
             <Trash2 className="h-3.5 w-3.5 mr-1" />
             Delete
@@ -113,7 +126,7 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
           <div className="max-w-3xl mx-auto">
             <MarkdownDoc
               value={content}
-              onChange={(v) => updateArtifact(activePlan.id, { content: v } as Partial<PlanArtifact>)}
+              onChange={(v) => debouncedUpdate({ id: activePlan.id, content: v })}
               placeholder="Describe the implementation plan..."
               minHeight="min-h-[400px]"
             />

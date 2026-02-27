@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   FileText,
   ClipboardList,
@@ -11,14 +11,17 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 import type { Artifact } from "@/lib/artifact-types";
 import { useWorkspaceContext, type ViewType } from "@/stores/workspace-context";
-import { useArtifactStore } from "@/stores/artifact-store";
+import { artifactToSyncInput } from "@/lib/transforms/roadmap";
 import { parsePersonaMarkdown, parseCompetitorMarkdown } from "@/lib/markdown-to-artifact";
 
 const artifactMeta: Record<
@@ -33,15 +36,96 @@ const artifactMeta: Record<
   roadmap: { icon: Map, label: "Roadmap", view: "roadmap", color: "text-cyan-400" },
 };
 
-export function ArtifactCard({ artifact }: { artifact: Artifact }) {
+function useSaveArtifact(projectId: string) {
+  const utils = trpc.useUtils();
+  const planCreate = trpc.plan.create.useMutation({
+    onSuccess: () => utils.plan.list.invalidate({ projectId }),
+  });
+  const prdCreate = trpc.prd.create.useMutation({
+    onSuccess: () => utils.prd.list.invalidate({ projectId }),
+  });
+  const personaCreate = trpc.persona.create.useMutation({
+    onSuccess: () => utils.persona.list.invalidate({ projectId }),
+  });
+  const competitorCreate = trpc.competitor.create.useMutation({
+    onSuccess: () => utils.competitor.list.invalidate({ projectId }),
+  });
+  const featureSync = trpc.feature.syncTree.useMutation({
+    onSuccess: () => utils.feature.tree.invalidate({ projectId }),
+  });
+  const roadmapSync = trpc.roadmap.syncFull.useMutation({
+    onSuccess: () => utils.roadmap.list.invalidate({ projectId }),
+  });
+
+  const save = useCallback(
+    async (artifact: Artifact) => {
+      switch (artifact.type) {
+        case "plan":
+          return planCreate.mutateAsync({ projectId, title: artifact.title, content: artifact.content });
+        case "prd":
+          return prdCreate.mutateAsync({ projectId, title: artifact.title, content: artifact.content });
+        case "persona":
+          return personaCreate.mutateAsync({
+            projectId,
+            name: artifact.title || artifact.name || "Persona",
+            content: artifact.content,
+          });
+        case "competitor":
+          return competitorCreate.mutateAsync({
+            projectId,
+            name: artifact.title || artifact.name || "Competitor",
+            content: artifact.content,
+          });
+        case "featureTree":
+          return featureSync.mutateAsync({
+            projectId,
+            rootFeature: artifact.rootFeature,
+            children: artifact.children,
+          });
+        case "roadmap": {
+          const input = artifactToSyncInput(artifact);
+          return roadmapSync.mutateAsync({ projectId, ...input });
+        }
+      }
+    },
+    [projectId, planCreate, prdCreate, personaCreate, competitorCreate, featureSync, roadmapSync],
+  );
+
+  const isPending =
+    planCreate.isPending ||
+    prdCreate.isPending ||
+    personaCreate.isPending ||
+    competitorCreate.isPending ||
+    featureSync.isPending ||
+    roadmapSync.isPending;
+
+  return { save, isPending };
+}
+
+export function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId: string }) {
   const [expanded, setExpanded] = useState(false);
   const [pushed, setPushed] = useState(false);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
-  const addArtifact = useArtifactStore((s) => s.addArtifact);
+  const { save, isPending } = useSaveArtifact(projectId);
   const meta = artifactMeta[artifact.type];
   const Icon = meta.icon;
 
   const title = getArtifactTitle(artifact);
+
+  const handleSave = async () => {
+    if (pushed) {
+      setActiveView(meta.view);
+      return;
+    }
+    try {
+      await save(artifact);
+      setPushed(true);
+      setActiveView(meta.view);
+      toast.success(`${meta.label} saved`);
+    } catch {
+      toast.error("Failed to save — try again");
+    }
+  };
 
   return (
     <Card className="bg-muted/50 border-border/50 overflow-hidden">
@@ -79,17 +163,16 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
               size="sm"
               variant={pushed ? "outline" : "secondary"}
               className="h-7 text-xs w-full justify-center"
-              onClick={() => {
-                if (!pushed) {
-                  addArtifact(artifact);
-                  setPushed(true);
-                }
-                setActiveView(meta.view);
-              }}
+              onClick={handleSave}
+              disabled={isPending}
             >
-              <ExternalLink className="h-3 w-3 shrink-0" />
+              {isPending ? (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              ) : (
+                <ExternalLink className="h-3 w-3 shrink-0" />
+              )}
               <span className="truncate">
-                {pushed ? `View in ${meta.label}` : `Push to ${meta.label}`}
+                {pushed ? `View in ${meta.label}` : `Save to ${meta.label}`}
               </span>
             </Button>
           </div>
