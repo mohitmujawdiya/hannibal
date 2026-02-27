@@ -187,6 +187,16 @@ export const featureRouter = router({
       });
     }),
 
+  deleteAll: protectedProcedure
+    .input(z.object({ projectId: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
+      return ctx.db.feature.updateMany({
+        where: { projectId: input.projectId, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+    }),
+
   move: protectedProcedure
     .input(
       z.object({

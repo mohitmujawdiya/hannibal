@@ -233,6 +233,10 @@ export function useProjectFeatureTree(projectId: string) {
     onSuccess: () => utils.feature.tree.invalidate({ projectId }),
   });
 
+  const deleteAllMutation = trpc.feature.deleteAll.useMutation({
+    onSuccess: () => utils.feature.tree.invalidate({ projectId }),
+  });
+
   const tree = useMemo(
     () => (query.data ? dbFeatureTreeToArtifact(query.data) : null),
     [query.data],
@@ -244,10 +248,16 @@ export function useProjectFeatureTree(projectId: string) {
     [syncMutation, projectId],
   );
 
+  const removeAll = useCallback(() => {
+    deleteAllMutation.mutate({ projectId });
+    toast("Feature tree deleted", { duration: 5000 });
+  }, [deleteAllMutation, projectId]);
+
   return {
     tree,
     isLoading: query.isLoading,
     syncTree,
+    removeAll,
     isSyncing: syncMutation.isPending,
   };
 }

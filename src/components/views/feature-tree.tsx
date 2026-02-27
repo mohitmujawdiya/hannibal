@@ -143,7 +143,7 @@ function useUndoRedo<T>(maxHistory = 50) {
 }
 
 function FeatureTreeContent({ projectId }: { projectId: string }) {
-  const { tree: dbTree, isLoading, syncTree } = useProjectFeatureTree(projectId);
+  const { tree: dbTree, isLoading, syncTree, removeAll } = useProjectFeatureTree(projectId);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const [viewMode, setViewMode] = useState<"flow" | "list">("flow");
@@ -449,6 +449,19 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
             </Button>
           </div>
           <CopyButton getText={getCopyText} />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-muted-foreground hover:text-destructive"
+            onClick={() => {
+              if (window.confirm("Delete the entire feature tree? This cannot be undone.")) {
+                removeAll();
+              }
+            }}
+            title="Delete tree"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
 
