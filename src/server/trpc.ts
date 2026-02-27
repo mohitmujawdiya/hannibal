@@ -1,5 +1,6 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 
 export type Context = {
@@ -7,10 +8,11 @@ export type Context = {
   userId: string | null;
 };
 
-export function createContext(): Context {
+export async function createContext(): Promise<Context> {
+  const { userId } = await auth();
   return {
     db,
-    userId: null, // Will be populated by Clerk middleware later
+    userId,
   };
 }
 

@@ -1,21 +1,24 @@
 import { z } from "zod/v3";
 import { TRPCError } from "@trpc/server";
-import { publicProcedure, router } from "../trpc";
+import { protectedProcedure, router } from "../trpc";
+import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
 import { syncPersonaContent } from "../services/artifact";
 
 export const personaRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.persona.findMany({
         where: { projectId: input.projectId, deletedAt: null },
         orderBy: { updatedAt: "desc" },
       });
     }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
+  byId: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "persona", input.id, ctx.userId);
       const persona = await ctx.db.persona.findUnique({
         where: { id: input.id },
       });
@@ -28,10 +31,10 @@ export const personaRouter = router({
       return persona;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        projectId: z.string().cuid(),
         name: z.string().min(1).max(200),
         title: z.string().max(200).optional(),
         avatar: z.string().optional(),
@@ -46,6 +49,7 @@ export const personaRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       const { projectId, ...fields } = input;
 
       // If no content provided, generate from structured fields
@@ -67,10 +71,10 @@ export const personaRouter = router({
       });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         name: z.string().min(1).max(200).optional(),
         title: z.string().max(200).nullable().optional(),
         avatar: z.string().nullable().optional(),
@@ -85,22 +89,25 @@ export const personaRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "persona", input.id, ctx.userId);
       const { id, ...data } = input;
       return ctx.db.persona.update({ where: { id }, data });
     }),
 
-  delete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "persona", input.id, ctx.userId);
       return ctx.db.persona.update({
         where: { id: input.id },
         data: { deletedAt: new Date() },
       });
     }),
 
-  restore: publicProcedure
-    .input(z.object({ id: z.string() }))
+  restore: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "persona", input.id, ctx.userId);
       return ctx.db.persona.update({
         where: { id: input.id },
         data: { deletedAt: null },

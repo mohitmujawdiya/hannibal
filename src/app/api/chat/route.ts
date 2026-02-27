@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import { openai } from "@ai-sdk/openai";
 import {
   streamText,
@@ -12,6 +13,11 @@ import { artifactTools } from "@/server/ai/tools/generate-artifact";
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const body = await req.json();
   const {
     messages: rawMessages,
@@ -48,6 +54,7 @@ export async function POST(req: Request) {
     },
     stopWhen: stepCountIs(5),
     temperature: 0.7,
+    maxOutputTokens: 4096,
   });
 
   return result.toUIMessageStreamResponse();

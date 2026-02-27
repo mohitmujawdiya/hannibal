@@ -6,14 +6,16 @@ import {
   RoadmapItemType,
   DependencyType,
 } from "@/generated/prisma/client";
-import { publicProcedure, router } from "../trpc";
+import { protectedProcedure, router } from "../trpc";
+import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
 
 export const roadmapRouter = router({
   // ─── Roadmap CRUD ───────────────────────────────────────────────────────
 
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.roadmap.findMany({
         where: { projectId: input.projectId, deletedAt: null },
         orderBy: { updatedAt: "desc" },
@@ -24,9 +26,10 @@ export const roadmapRouter = router({
       });
     }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
+  byId: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmap", input.id, ctx.userId);
       const roadmap = await ctx.db.roadmap.findUnique({
         where: { id: input.id },
         include: {
@@ -51,16 +54,17 @@ export const roadmapRouter = router({
       return roadmap;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        projectId: z.string().cuid(),
         title: z.string().min(1).max(500),
         description: z.string().max(2000).optional(),
         timeScale: z.nativeEnum(RoadmapTimeScale).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.roadmap.create({
         data: {
           title: input.title,
@@ -71,23 +75,25 @@ export const roadmapRouter = router({
       });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         title: z.string().min(1).max(500).optional(),
         description: z.string().max(2000).optional(),
         timeScale: z.nativeEnum(RoadmapTimeScale).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmap", input.id, ctx.userId);
       const { id, ...data } = input;
       return ctx.db.roadmap.update({ where: { id }, data });
     }),
 
-  delete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmap", input.id, ctx.userId);
       return ctx.db.roadmap.update({
         where: { id: input.id },
         data: { deletedAt: new Date() },
@@ -96,16 +102,17 @@ export const roadmapRouter = router({
 
   // ─── Lane CRUD ──────────────────────────────────────────────────────────
 
-  laneCreate: publicProcedure
+  laneCreate: protectedProcedure
     .input(
       z.object({
-        roadmapId: z.string(),
+        roadmapId: z.string().cuid(),
         name: z.string().min(1).max(200),
         color: z.string().max(20).optional(),
         order: z.number().int().min(0).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmap", input.roadmapId, ctx.userId);
       return ctx.db.roadmapLane.create({
         data: {
           name: input.name,
@@ -116,35 +123,38 @@ export const roadmapRouter = router({
       });
     }),
 
-  laneUpdate: publicProcedure
+  laneUpdate: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         name: z.string().min(1).max(200).optional(),
         color: z.string().max(20).optional(),
         order: z.number().int().min(0).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmapLane", input.id, ctx.userId);
       const { id, ...data } = input;
       return ctx.db.roadmapLane.update({ where: { id }, data });
     }),
 
-  laneDelete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  laneDelete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmapLane", input.id, ctx.userId);
       await ctx.db.roadmapLane.delete({ where: { id: input.id } });
       return { id: input.id };
     }),
 
-  lanesReorder: publicProcedure
+  lanesReorder: protectedProcedure
     .input(
       z.object({
-        roadmapId: z.string(),
+        roadmapId: z.string().cuid(),
         laneIds: z.array(z.string()),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmap", input.roadmapId, ctx.userId);
       return ctx.db.$transaction(
         input.laneIds.map((id, index) =>
           ctx.db.roadmapLane.update({
@@ -157,11 +167,11 @@ export const roadmapRouter = router({
 
   // ─── Item CRUD ──────────────────────────────────────────────────────────
 
-  itemCreate: publicProcedure
+  itemCreate: protectedProcedure
     .input(
       z.object({
-        roadmapId: z.string(),
-        laneId: z.string().nullable().optional(),
+        roadmapId: z.string().cuid(),
+        laneId: z.string().cuid().nullable().optional(),
         title: z.string().min(1).max(500),
         description: z.string().max(5000).optional(),
         type: z.nativeEnum(RoadmapItemType).optional(),
@@ -173,10 +183,11 @@ export const roadmapRouter = router({
         color: z.string().max(20).optional(),
         progress: z.number().int().min(0).max(100).optional(),
         order: z.number().int().min(0).optional(),
-        featureId: z.string().nullable().optional(),
+        featureId: z.string().cuid().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmap", input.roadmapId, ctx.userId);
       return ctx.db.roadmapItem.create({
         data: {
           title: input.title,
@@ -197,10 +208,10 @@ export const roadmapRouter = router({
       });
     }),
 
-  itemUpdate: publicProcedure
+  itemUpdate: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         title: z.string().min(1).max(500).optional(),
         description: z.string().max(5000).nullable().optional(),
         type: z.nativeEnum(RoadmapItemType).optional(),
@@ -212,11 +223,12 @@ export const roadmapRouter = router({
         color: z.string().max(20).nullable().optional(),
         progress: z.number().int().min(0).max(100).nullable().optional(),
         order: z.number().int().min(0).optional(),
-        laneId: z.string().nullable().optional(),
-        featureId: z.string().nullable().optional(),
+        laneId: z.string().cuid().nullable().optional(),
+        featureId: z.string().cuid().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmapItem", input.id, ctx.userId);
       const { id, startDate, endDate, ...rest } = input;
       return ctx.db.roadmapItem.update({
         where: { id },
@@ -232,23 +244,25 @@ export const roadmapRouter = router({
       });
     }),
 
-  itemDelete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  itemDelete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmapItem", input.id, ctx.userId);
       await ctx.db.roadmapItem.delete({ where: { id: input.id } });
       return { id: input.id };
     }),
 
-  itemMove: publicProcedure
+  itemMove: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
-        laneId: z.string().nullable().optional(),
+        id: z.string().cuid(),
+        laneId: z.string().cuid().nullable().optional(),
         startDate: z.string(),
         endDate: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmapItem", input.id, ctx.userId);
       return ctx.db.roadmapItem.update({
         where: { id: input.id },
         data: {
@@ -259,13 +273,13 @@ export const roadmapRouter = router({
       });
     }),
 
-  itemsBatch: publicProcedure
+  itemsBatch: protectedProcedure
     .input(
       z.object({
         updates: z.array(
           z.object({
-            id: z.string(),
-            laneId: z.string().nullable().optional(),
+            id: z.string().cuid(),
+            laneId: z.string().cuid().nullable().optional(),
             startDate: z.string().optional(),
             endDate: z.string().optional(),
             status: z.nativeEnum(RoadmapItemStatus).optional(),
@@ -275,6 +289,10 @@ export const roadmapRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Verify ownership via the first item
+      if (input.updates.length > 0) {
+        await assertResourceOwnership(ctx.db, "roadmapItem", input.updates[0].id, ctx.userId);
+      }
       return ctx.db.$transaction(
         input.updates.map(({ id, startDate, endDate, ...rest }) =>
           ctx.db.roadmapItem.update({
@@ -291,15 +309,16 @@ export const roadmapRouter = router({
 
   // ─── Dependencies ───────────────────────────────────────────────────────
 
-  depCreate: publicProcedure
+  depCreate: protectedProcedure
     .input(
       z.object({
-        fromItemId: z.string(),
-        toItemId: z.string(),
+        fromItemId: z.string().cuid(),
+        toItemId: z.string().cuid(),
         type: z.nativeEnum(DependencyType).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmapItem", input.fromItemId, ctx.userId);
       return ctx.db.roadmapDependency.create({
         data: {
           fromItemId: input.fromItemId,
@@ -309,9 +328,10 @@ export const roadmapRouter = router({
       });
     }),
 
-  depDelete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  depDelete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmapDependency", input.id, ctx.userId);
       await ctx.db.roadmapDependency.delete({ where: { id: input.id } });
       return { id: input.id };
     }),

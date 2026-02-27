@@ -28,6 +28,7 @@ import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useArtifactStore } from "@/stores/artifact-store";
 import { ArtifactCard } from "@/components/ai/artifact-card";
 import { localChatStore } from "@/lib/chat-persistence";
+import { sanitizeUrl } from "@/lib/sanitize-url";
 import type { Artifact, FeatureNode, RoadmapArtifact, RoadmapItem } from "@/lib/artifact-types";
 import { featureTreeToContentMarkdown, roadmapToMarkdown } from "@/lib/artifact-to-markdown";
 import { useRoadmaps } from "@/stores/artifact-store";
@@ -626,18 +627,22 @@ function formatInline(text: string): React.ReactNode {
         </code>
       );
     const linkMatch = part.match(/\[(.*?)\]\((.*?)\)/);
-    if (linkMatch)
-      return (
-        <a
-          key={i}
-          href={linkMatch[2]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary underline underline-offset-2"
-        >
-          {linkMatch[1]}
-        </a>
-      );
+    if (linkMatch) {
+      const safeHref = sanitizeUrl(linkMatch[2]);
+      if (safeHref)
+        return (
+          <a
+            key={i}
+            href={safeHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2"
+          >
+            {linkMatch[1]}
+          </a>
+        );
+      return <span key={i}>{linkMatch[1]}</span>;
+    }
     return part;
   });
 }

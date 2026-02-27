@@ -3,6 +3,14 @@ import type { Artifact } from "@/lib/artifact-types";
 
 type StoredArtifact = Artifact & { id: string; createdAt: number };
 
+/** Strip characters that could be used for prompt injection delimiters */
+function sanitizePromptInput(value: string, maxLength = 500): string {
+  return value
+    .replace(/[#\-<>{}[\]]/g, "")
+    .slice(0, maxLength)
+    .trim();
+}
+
 export function buildSystemPrompt({
   activeView,
   selectedEntity,
@@ -32,18 +40,19 @@ export function buildSystemPrompt({
   let contextSection = `\n## Current Context\n- Active view: ${activeView}\n- ${viewContextMap[activeView]}`;
 
   if (projectName) {
-    contextSection += `\n- Project: ${projectName}`;
+    contextSection += `\n- Project: ${sanitizePromptInput(projectName, 200)}`;
   }
 
   if (selectedEntity) {
-    contextSection += `\n- Selected ${selectedEntity.type}: ${selectedEntity.id}`;
+    contextSection += `\n- Selected ${sanitizePromptInput(selectedEntity.type, 50)}: ${sanitizePromptInput(selectedEntity.id, 100)}`;
     if (selectedEntity.data) {
-      contextSection += `\n- Entity data: ${JSON.stringify(selectedEntity.data)}`;
+      const safeData = sanitizePromptInput(JSON.stringify(selectedEntity.data), 1000);
+      contextSection += `\n- Entity data: ${safeData}`;
     }
   }
 
   if (highlightedText) {
-    contextSection += `\n- Highlighted text: "${highlightedText}"`;
+    contextSection += `\n- Highlighted text: "${sanitizePromptInput(highlightedText, 2000)}"`;
   }
 
   const artifactSection = buildArtifactContext(artifacts);

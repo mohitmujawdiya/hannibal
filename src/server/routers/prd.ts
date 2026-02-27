@@ -1,21 +1,24 @@
 import { z } from "zod/v3";
 import { TRPCError } from "@trpc/server";
 import { PRDStatus } from "@/generated/prisma/client";
-import { publicProcedure, router } from "../trpc";
+import { protectedProcedure, router } from "../trpc";
+import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
 
 export const prdRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.pRD.findMany({
         where: { projectId: input.projectId, deletedAt: null },
         orderBy: { updatedAt: "desc" },
       });
     }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
+  byId: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "prd", input.id, ctx.userId);
       const prd = await ctx.db.pRD.findUnique({
         where: { id: input.id },
       });
@@ -25,18 +28,19 @@ export const prdRouter = router({
       return prd;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        projectId: z.string().cuid(),
         title: z.string().min(1).max(500),
         content: z.string().max(100_000).default(""),
         description: z.string().max(1000).optional(),
         owner: z.string().max(200).optional(),
-        planId: z.string().optional(),
+        planId: z.string().cuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.pRD.create({
         data: {
           title: input.title,
@@ -49,63 +53,68 @@ export const prdRouter = router({
       });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         title: z.string().min(1).max(500).optional(),
         content: z.string().max(100_000).optional(),
         description: z.string().max(1000).optional(),
         owner: z.string().max(200).optional(),
         status: z.nativeEnum(PRDStatus).optional(),
-        planId: z.string().nullable().optional(),
+        planId: z.string().cuid().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "prd", input.id, ctx.userId);
       const { id, ...data } = input;
       return ctx.db.pRD.update({ where: { id }, data });
     }),
 
-  delete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "prd", input.id, ctx.userId);
       return ctx.db.pRD.update({
         where: { id: input.id },
         data: { deletedAt: new Date() },
       });
     }),
 
-  restore: publicProcedure
-    .input(z.object({ id: z.string() }))
+  restore: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "prd", input.id, ctx.userId);
       return ctx.db.pRD.update({
         where: { id: input.id },
         data: { deletedAt: null },
       });
     }),
 
-  updateStatus: publicProcedure
+  updateStatus: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         status: z.nativeEnum(PRDStatus),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "prd", input.id, ctx.userId);
       return ctx.db.pRD.update({
         where: { id: input.id },
         data: { status: input.status },
       });
     }),
 
-  linkToPlan: publicProcedure
+  linkToPlan: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
-        planId: z.string(),
+        id: z.string().cuid(),
+        planId: z.string().cuid(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "prd", input.id, ctx.userId);
       return ctx.db.pRD.update({
         where: { id: input.id },
         data: { planId: input.planId },

@@ -13,6 +13,7 @@ import {
   Settings,
   PanelLeftClose,
 } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -91,7 +92,7 @@ export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
         {/* Bottom */}
         <Separator className="w-10" />
         <div className="flex flex-col items-center gap-1 py-3">
-          <div className="h-7 w-7 rounded-full bg-muted" />
+          <UserButton appearance={{ elements: { avatarBox: "h-7 w-7" } }} />
         </div>
       </div>
     );
@@ -151,7 +152,7 @@ export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
       {/* Bottom */}
       <Separator />
       <div className="flex items-center gap-2 px-4 py-3">
-        <div className="h-6 w-6 rounded-full bg-muted" />
+        <UserButton appearance={{ elements: { avatarBox: "h-6 w-6" } }} />
         <Button variant="ghost" size="icon" className="ml-auto h-7 w-7">
           <Settings className="h-4 w-4" />
         </Button>

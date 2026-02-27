@@ -28,6 +28,7 @@ import { competitorToMarkdown } from "@/lib/artifact-to-markdown";
 import { parseCompetitorMarkdown } from "@/lib/markdown-to-artifact";
 import type { ParsedCompetitor } from "@/lib/markdown-to-artifact";
 import type { CompetitorArtifact } from "@/lib/artifact-types";
+import { sanitizeUrl } from "@/lib/sanitize-url";
 
 function getCompetitorContent(comp: CompetitorArtifact): string {
   if (comp.content != null && comp.content.trim()) return comp.content;
@@ -145,9 +146,9 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                       <div>
                         <CardTitle className="text-base flex items-center gap-2">
                           {comp.title || parsed.name}
-                          {parsed.url && (
+                          {parsed.url && sanitizeUrl(parsed.url) && (
                             <a
-                              href={parsed.url}
+                              href={sanitizeUrl(parsed.url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-muted-foreground hover:text-foreground"

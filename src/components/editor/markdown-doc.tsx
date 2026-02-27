@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { cn } from "@/lib/utils";
 
 type MarkdownDocProps = {
@@ -107,7 +108,7 @@ export function MarkdownDoc({
         )}
       >
         {value.trim() ? (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{value}</ReactMarkdown>
         ) : (
           <p className="text-muted-foreground">{placeholder}</p>
         )}

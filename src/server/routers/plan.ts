@@ -1,21 +1,24 @@
 import { z } from "zod/v3";
 import { TRPCError } from "@trpc/server";
 import { PlanStatus } from "@/generated/prisma/client";
-import { publicProcedure, router } from "../trpc";
+import { protectedProcedure, router } from "../trpc";
+import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
 
 export const planRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.plan.findMany({
         where: { projectId: input.projectId, deletedAt: null },
         orderBy: { updatedAt: "desc" },
       });
     }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
+  byId: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "plan", input.id, ctx.userId);
       const plan = await ctx.db.plan.findUnique({
         where: { id: input.id },
       });
@@ -25,10 +28,10 @@ export const planRouter = router({
       return plan;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        projectId: z.string().cuid(),
         title: z.string().min(1).max(500),
         content: z.string().max(100_000).default(""),
         description: z.string().max(1000).optional(),
@@ -36,6 +39,7 @@ export const planRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.plan.create({
         data: {
           title: input.title,
@@ -47,10 +51,10 @@ export const planRouter = router({
       });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         title: z.string().min(1).max(500).optional(),
         content: z.string().max(100_000).optional(),
         description: z.string().max(1000).optional(),
@@ -59,36 +63,40 @@ export const planRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "plan", input.id, ctx.userId);
       const { id, ...data } = input;
       return ctx.db.plan.update({ where: { id }, data });
     }),
 
-  delete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "plan", input.id, ctx.userId);
       return ctx.db.plan.update({
         where: { id: input.id },
         data: { deletedAt: new Date() },
       });
     }),
 
-  restore: publicProcedure
-    .input(z.object({ id: z.string() }))
+  restore: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "plan", input.id, ctx.userId);
       return ctx.db.plan.update({
         where: { id: input.id },
         data: { deletedAt: null },
       });
     }),
 
-  updateStatus: publicProcedure
+  updateStatus: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         status: z.nativeEnum(PlanStatus),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "plan", input.id, ctx.userId);
       return ctx.db.plan.update({
         where: { id: input.id },
         data: { status: input.status },

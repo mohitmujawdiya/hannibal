@@ -1,23 +1,31 @@
 import { z } from "zod/v3";
-import { publicProcedure, router } from "../trpc";
+import { TRPCError } from "@trpc/server";
+import { protectedProcedure, router } from "../trpc";
 
 export const projectRouter = router({
-  list: publicProcedure.query(async ({ ctx }) => {
+  list: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db.project.findMany({
-      where: { deletedAt: null },
+      where: { userId: ctx.userId, deletedAt: null },
       orderBy: { updatedAt: "desc" },
     });
   }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
+  byId: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
-      return ctx.db.project.findUnique({
+      const project = await ctx.db.project.findUnique({
         where: { id: input.id },
       });
+      if (!project || project.deletedAt) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
+      }
+      if (project.userId !== ctx.userId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
+      }
+      return project;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
         name: z.string().min(1).max(200),
@@ -28,27 +36,35 @@ export const projectRouter = router({
       return ctx.db.project.create({
         data: {
           ...input,
-          userId: ctx.userId ?? "demo-user",
+          userId: ctx.userId,
         },
       });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         name: z.string().min(1).max(200).optional(),
         description: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const project = await ctx.db.project.findUnique({ where: { id: input.id } });
+      if (!project) throw new TRPCError({ code: "NOT_FOUND" });
+      if (project.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" });
+
       const { id, ...data } = input;
       return ctx.db.project.update({ where: { id }, data });
     }),
 
-  delete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      const project = await ctx.db.project.findUnique({ where: { id: input.id } });
+      if (!project) throw new TRPCError({ code: "NOT_FOUND" });
+      if (project.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" });
+
       return ctx.db.project.update({
         where: { id: input.id },
         data: { deletedAt: new Date() },

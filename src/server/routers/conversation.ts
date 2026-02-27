@@ -1,12 +1,14 @@
 import { z } from "zod/v3";
 import { TRPCError } from "@trpc/server";
 import { MessageRole } from "@/generated/prisma/client";
-import { publicProcedure, router } from "../trpc";
+import { protectedProcedure, router } from "../trpc";
+import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
 
 export const conversationRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.conversation.findMany({
         where: { projectId: input.projectId },
         orderBy: { updatedAt: "desc" },
@@ -16,9 +18,10 @@ export const conversationRouter = router({
       });
     }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
+  byId: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "conversation", input.id, ctx.userId);
       const conversation = await ctx.db.conversation.findUnique({
         where: { id: input.id },
         include: {
@@ -34,14 +37,15 @@ export const conversationRouter = router({
       return conversation;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        projectId: z.string().cuid(),
         title: z.string().max(500).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.conversation.create({
         data: {
           title: input.title,
@@ -50,30 +54,32 @@ export const conversationRouter = router({
       });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         title: z.string().min(1).max(500),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "conversation", input.id, ctx.userId);
       return ctx.db.conversation.update({
         where: { id: input.id },
         data: { title: input.title },
       });
     }),
 
-  addMessage: publicProcedure
+  addMessage: protectedProcedure
     .input(
       z.object({
-        conversationId: z.string(),
+        conversationId: z.string().cuid(),
         role: z.nativeEnum(MessageRole),
         content: z.string().max(200_000),
-        metadata: z.any().optional(),
+        metadata: z.record(z.string(), z.any()).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "conversation", input.conversationId, ctx.userId);
       // Update conversation's updatedAt timestamp
       await ctx.db.conversation.update({
         where: { id: input.conversationId },
@@ -90,15 +96,16 @@ export const conversationRouter = router({
       });
     }),
 
-  getMessages: publicProcedure
+  getMessages: protectedProcedure
     .input(
       z.object({
-        conversationId: z.string(),
+        conversationId: z.string().cuid(),
         limit: z.number().int().min(1).max(100).default(50),
         cursor: z.string().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "conversation", input.conversationId, ctx.userId);
       const messages = await ctx.db.message.findMany({
         where: { conversationId: input.conversationId },
         orderBy: { createdAt: "asc" },
@@ -117,9 +124,10 @@ export const conversationRouter = router({
       return { messages, nextCursor };
     }),
 
-  delete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "conversation", input.id, ctx.userId);
       await ctx.db.conversation.delete({ where: { id: input.id } });
       return { id: input.id };
     }),

@@ -1,7 +1,8 @@
 import { z } from "zod/v3";
 import { TRPCError } from "@trpc/server";
 import { FeatureStatus } from "@/generated/prisma/client";
-import { publicProcedure, router } from "../trpc";
+import { protectedProcedure, router } from "../trpc";
+import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
 import { computeRiceScore } from "../services/artifact";
 
 // Recursive include builder for nested feature tree
@@ -17,18 +18,20 @@ function buildChildrenInclude(depth: number): object | undefined {
 }
 
 export const featureRouter = router({
-  list: publicProcedure
+  list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.feature.findMany({
         where: { projectId: input.projectId, deletedAt: null },
         orderBy: { order: "asc" },
       });
     }),
 
-  tree: publicProcedure
+  tree: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.feature.findMany({
         where: {
           projectId: input.projectId,
@@ -40,9 +43,10 @@ export const featureRouter = router({
       });
     }),
 
-  byId: publicProcedure
-    .input(z.object({ id: z.string() }))
+  byId: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .query(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "feature", input.id, ctx.userId);
       const feature = await ctx.db.feature.findUnique({
         where: { id: input.id },
         include: buildChildrenInclude(3),
@@ -56,18 +60,19 @@ export const featureRouter = router({
       return feature;
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
-        projectId: z.string(),
+        projectId: z.string().cuid(),
         title: z.string().min(1).max(500),
         description: z.string().max(5000).optional(),
-        parentId: z.string().nullable().optional(),
+        parentId: z.string().cuid().nullable().optional(),
         status: z.nativeEnum(FeatureStatus).optional(),
         order: z.number().int().min(0).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       return ctx.db.feature.create({
         data: {
           title: input.title,
@@ -80,10 +85,10 @@ export const featureRouter = router({
       });
     }),
 
-  update: publicProcedure
+  update: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.string().cuid(),
         title: z.string().min(1).max(500).optional(),
         description: z.string().max(5000).optional(),
         status: z.nativeEnum(FeatureStatus).optional(),
@@ -100,6 +105,7 @@ export const featureRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "feature", input.id, ctx.userId);
       const { id, ...data } = input;
 
       // Auto-compute RICE score if any RICE field is provided
@@ -135,45 +141,48 @@ export const featureRouter = router({
       });
     }),
 
-  delete: publicProcedure
-    .input(z.object({ id: z.string() }))
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "feature", input.id, ctx.userId);
       return ctx.db.feature.update({
         where: { id: input.id },
         data: { deletedAt: new Date() },
       });
     }),
 
-  restore: publicProcedure
-    .input(z.object({ id: z.string() }))
+  restore: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "feature", input.id, ctx.userId);
       return ctx.db.feature.update({
         where: { id: input.id },
         data: { deletedAt: null },
       });
     }),
 
-  move: publicProcedure
+  move: protectedProcedure
     .input(
       z.object({
-        id: z.string(),
-        parentId: z.string().nullable(),
+        id: z.string().cuid(),
+        parentId: z.string().cuid().nullable(),
         order: z.number().int().min(0),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "feature", input.id, ctx.userId);
       return ctx.db.feature.update({
         where: { id: input.id },
         data: { parentId: input.parentId, order: input.order },
       });
     }),
 
-  batchUpdateRice: publicProcedure
+  batchUpdateRice: protectedProcedure
     .input(
       z.object({
         updates: z.array(
           z.object({
-            id: z.string(),
+            id: z.string().cuid(),
             riceReach: z.number().min(0).nullable().optional(),
             riceImpact: z.number().min(0).nullable().optional(),
             riceConfidence: z.number().min(0).max(100).nullable().optional(),
@@ -184,6 +193,10 @@ export const featureRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Verify ownership via the first feature's project
+      if (input.updates.length > 0) {
+        await assertResourceOwnership(ctx.db, "feature", input.updates[0].id, ctx.userId);
+      }
       return ctx.db.$transaction(
         input.updates.map((u) => {
           const { id, ...data } = u;
