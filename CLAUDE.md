@@ -4,14 +4,14 @@
 "Cursor for PMs." An AI-native workspace where product managers create plans, PRDs, feature trees, roadmaps, personas, and competitive analysis — with AI assistance throughout.
 
 ## Tech Stack
-- Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui
-- Novel (AI-native Tiptap editor) for rich text surfaces (plans, PRDs)
-- React Flow for feature tree visualization
-- dnd-kit for drag-and-drop (kanban)
+- Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS 4, shadcn/ui
+- MarkdownDoc component (react-markdown + textarea edit mode) for rich text surfaces (plans, PRDs)
+- @xyflow/react + dagre for feature tree visualization
+- dnd-timeline + dnd-kit for roadmap timeline drag-and-drop
 - react-resizable-panels for the workspace layout
-- tRPC for type-safe API, Prisma + PostgreSQL for data
-- Vercel AI SDK (OpenAI GPT-4o) for AI streaming and tool calling
-- Zustand for client state, TanStack Query for server state
+- tRPC v11 for type-safe API, Prisma 7 + PostgreSQL for data
+- Vercel AI SDK v6 (OpenAI GPT-4o) for AI streaming and tool calling, Tavily for web search
+- Zustand 5 for client state, TanStack Query 5 for server state
 - Clerk for auth
 
 ## Workspace Layout (Three-Panel)
@@ -34,13 +34,23 @@ Zustand store `useWorkspaceContext` connects all three panels:
 
 ## Folder Structure
 - `src/app/(workspace)/[projectId]/layout.tsx` — workspace shell
-- `src/components/workspace/` — shell components (sidebar, ai-panel, main-content)
+- `src/app/api/chat/route.ts` — AI chat endpoint (streaming, tool calls, project context)
+- `src/app/api/trpc/` — tRPC API handler
+- `src/components/workspace/` — shell components (sidebar, ai-panel, main-content, project-switcher)
 - `src/components/views/` — main content views (plan-editor, feature-tree, roadmap, etc.)
-- `src/components/ai/` — AI panel sub-components (chat, artifacts, question cards)
+- `src/components/views/dashboard/` — overview dashboard widgets
+- `src/components/views/roadmap/` — roadmap timeline sub-components
+- `src/components/ai/` — AI panel sub-components (artifact-card)
+- `src/components/editor/` — MarkdownDoc component (react-markdown + textarea)
 - `src/components/ui/` — shadcn/ui primitives
-- `src/server/routers/` — tRPC routers
-- `src/server/ai/` — AI orchestration (agents, prompts, tools)
-- `src/stores/` — Zustand stores
+- `src/hooks/` — shared hooks (use-conversation, use-project-data, use-debounced-mutation)
+- `src/lib/` — utilities (artifact types, markdown parsers, RICE scoring, rate limiting)
+- `src/lib/transforms/` — artifact serialization transforms (plan, prd, persona, competitor, feature-tree, roadmap)
+- `src/server/routers/` — tRPC routers (project, plan, prd, feature, persona, competitor, roadmap, conversation)
+- `src/server/ai/prompts/` — system prompt builder + artifact serializers
+- `src/server/ai/tools/` — AI tool definitions (generate-artifact, read-artifact, web-search)
+- `src/server/services/` — business logic (feature-sync, roadmap-sync, project-context, auth, artifact)
+- `src/stores/` — Zustand stores (workspace-context, artifact-store, project-store)
 - `prisma/` — schema and migrations
 
 ---
@@ -93,12 +103,33 @@ Every view must:
 ## AI Orchestration
 - Vercel AI SDK (`ai` package) for streaming and tool calling
 - OpenAI GPT-4o as primary model, Tavily API for web research
-- Each AI capability is a separate agent in `src/server/ai/agents/`
-- System prompts in `src/server/ai/prompts/` as exported string constants
-- Always `streamText` for user-facing chat; `generateText` for background tasks
-- Tool definitions live alongside their agent
-- Include `maxTokens` and `temperature` explicitly
-- Artifacts are typed (`plan | prd | persona | featureTree | competitor`), rendered inline in AI panel, saved to DB on "Push to View"
+- Single chat endpoint (`src/app/api/chat/route.ts`) orchestrates all AI via `streamText`
+- System prompt built dynamically in `src/server/ai/prompts/system.ts` with view context + artifact state
+- Tool definitions in `src/server/ai/tools/` (generate-artifact, read-artifact, web-search)
+- Include `maxOutputTokens` and `temperature` explicitly
+- Artifacts are typed (`plan | prd | persona | featureTree | competitor | roadmap`), rendered inline in AI panel, saved to DB on "Push to View"
+
+### Three-Tier Artifact Context
+The system prompt includes artifact state tiered by relevance to the active view:
+- **Tier 1 (full content):** Artifacts matching the active view (e.g. plan artifact on plan view) — serialized in full up to 8000 chars
+- **Tier 2 (summaries):** All other artifacts — one-line summaries with counts and structure
+- View-to-artifact mapping defined in `VIEW_PRIMARY_ARTIFACTS` in `system.ts`
+- `readArtifact` / `readAllArtifacts` tools let the AI fetch full content for Tier 2 artifacts on demand
+
+### Expert Prompt Pattern
+Tool descriptions use expert personas with per-section quality criteria rather than format-only instructions. Section headings are framed as "typical sections (include all that apply, skip or add as context demands)" so the AI can adapt structure to context.
+
+### Artifact Parsing & Extras Catch-All
+- Persona and competitor artifacts are stored as markdown but parsed into structured fields for card UI rendering
+- Parsers are in `src/lib/markdown-to-artifact.ts` with inverse builders in the view components
+- **Extras catch-all:** `extractUnrecognizedSections()` captures any bold-labeled sections the parser doesn't explicitly handle, so new AI-generated sections render instead of being silently dropped
+- Known fields get structured pretty rendering (colored icons, grids); unknown extras render as neutral text blocks
+
+### Conversation Persistence
+- Chat history persisted to DB via `conversation` tRPC router
+- Messages serialized/deserialized via `src/lib/chat-serialization.ts`
+- `useConversation` hook manages conversation lifecycle per project
+- Project context (saved artifacts from DB) loaded server-side in the chat route via `src/server/services/project-context.ts`
 
 ---
 
