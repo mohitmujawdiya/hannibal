@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Map, PanelRight } from "lucide-react";
+import { Map, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useRoadmaps, useArtifactStore, softDeleteArtifact } from "@/stores/artifact-store";
@@ -21,6 +21,7 @@ import type {
 export function RoadmapView({ projectId }: { projectId: string }) {
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
+  const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const setSelectedEntity = useWorkspaceContext((s) => s.setSelectedEntity);
   const roadmaps = useRoadmaps();
   const updateArtifact = useArtifactStore((s) => s.updateArtifact);
@@ -151,10 +152,12 @@ export function RoadmapView({ projectId }: { projectId: string }) {
               Plan your timeline with swim lanes, milestones, and feature bars.
               Ask the AI to generate a roadmap, or create one manually.
             </p>
-            <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
-              <PanelRight className="h-3.5 w-3.5 mr-1.5" />
-              Open AI Panel
-            </Button>
+            {!aiPanelOpen && (
+              <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                Open AI Panel
+              </Button>
+            )}
           </div>
         </div>
       </div>

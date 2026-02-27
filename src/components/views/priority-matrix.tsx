@@ -425,6 +425,7 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
   const trees = useFeatureTrees();
   const updateArtifact = useArtifactStore((s) => s.updateArtifact);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
+  const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
 
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -497,13 +498,12 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
             <p className="text-sm text-muted-foreground mb-4">
               Create a feature tree first, then come back to score and prioritize features.
             </p>
-            <button
-              onClick={() => setAiPanelOpen(true)}
-              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Open AI Panel
-            </button>
+            {!aiPanelOpen && (
+              <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                Open AI Panel
+              </Button>
+            )}
           </div>
         </div>
       </div>

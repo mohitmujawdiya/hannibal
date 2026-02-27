@@ -72,6 +72,7 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
   const competitors = useCompetitors();
   const updateArtifact = useArtifactStore((s) => s.updateArtifact);
   const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
+  const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,13 +92,12 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
             <p className="text-sm text-muted-foreground mb-4">
               Ask Hannibal to analyze competitors in your market.
             </p>
-            <button
-              onClick={() => setAiPanelOpen(true)}
-              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Open AI Panel
-            </button>
+            {!aiPanelOpen && (
+              <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                Open AI Panel
+              </Button>
+            )}
           </div>
         </div>
       </div>
