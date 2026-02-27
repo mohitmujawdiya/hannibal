@@ -34,7 +34,7 @@ export function MainContent({ projectId }: MainContentProps) {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <View projectId={projectId} />
+      <View key={projectId} projectId={projectId} />
     </div>
   );
 }
