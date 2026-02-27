@@ -15,6 +15,7 @@ import {
   Pencil,
   Check,
   X,
+  Compass,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectPersonas } from "@/hooks/use-project-data";
 import { parsePersonaMarkdown } from "@/lib/markdown-to-artifact";
-import type { ParsedPersona } from "@/lib/markdown-to-artifact";
+import type { ParsedPersona, ExtraSection } from "@/lib/markdown-to-artifact";
 
 function buildPersonaMarkdown(fields: ParsedPersona): string {
   const parts: string[] = [
@@ -42,8 +43,18 @@ function buildPersonaMarkdown(fields: ParsedPersona): string {
   if (fields.behaviors.length > 0) {
     parts.push(`**Behaviors:**\n${fields.behaviors.map((b) => `- ${b}`).join("\n")}`);
   }
+  if (fields.decisionMakingContext?.trim()) {
+    parts.push(`**Decision-Making Context:**\n${fields.decisionMakingContext}`);
+  }
   if (fields.notes?.trim()) {
     parts.push(`**Notes:**\n${fields.notes}`);
+  }
+  for (const extra of fields.extras) {
+    if (extra.content.trim()) {
+      parts.push(extra.content.includes("\n")
+        ? `**${extra.label}:**\n${extra.content}`
+        : `**${extra.label}:** ${extra.content}`);
+    }
   }
   return parts.join("\n\n");
 }
@@ -234,6 +245,16 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                       />
                     )}
 
+                    {parsed.decisionMakingContext && (
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-violet-400 mb-1.5">
+                          <Compass className="h-3 w-3" />
+                          Decision-Making Context
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-3">{parsed.decisionMakingContext}</p>
+                      </div>
+                    )}
+
                     {parsed.notes && (
                       <div>
                         <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
@@ -243,6 +264,15 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-3">{parsed.notes}</p>
                       </div>
                     )}
+
+                    {parsed.extras.map((extra) => (
+                      <div key={extra.label}>
+                        <div className="text-xs font-medium text-muted-foreground mb-1.5">
+                          {extra.label}
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-3">{extra.content}</p>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
               );
@@ -271,7 +301,13 @@ function EditPersonaCard({
   const [goals, setGoals] = useState(listToLines(parsed.goals));
   const [frustrations, setFrustrations] = useState(listToLines(parsed.frustrations));
   const [behaviors, setBehaviors] = useState(listToLines(parsed.behaviors));
+  const [decisionMakingContext, setDecisionMakingContext] = useState(parsed.decisionMakingContext);
   const [notes, setNotes] = useState(parsed.notes);
+  const [extras, setExtras] = useState<ExtraSection[]>(parsed.extras);
+
+  const updateExtra = (index: number, content: string) => {
+    setExtras((prev) => prev.map((e, i) => (i === index ? { ...e, content } : e)));
+  };
 
   const handleSave = () => {
     onSave({
@@ -282,7 +318,9 @@ function EditPersonaCard({
       goals: linesToList(goals),
       frustrations: linesToList(frustrations),
       behaviors: linesToList(behaviors),
+      decisionMakingContext,
       notes,
+      extras,
     });
   };
 
@@ -391,6 +429,17 @@ function EditPersonaCard({
           placeholder="One behavior per line"
         />
 
+        <EditField label="Decision-Making Context" icon={Compass}>
+          <textarea
+            value={decisionMakingContext}
+            onChange={(e) => setDecisionMakingContext(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={Math.max(2, decisionMakingContext.split("\n").length)}
+            className="text-sm bg-transparent border-none outline-none w-full resize-none placeholder:text-muted-foreground"
+            placeholder="Trigger event, evaluation criteria, decision authority, switching cost..."
+          />
+        </EditField>
+
         <EditField label="Notes" icon={StickyNote}>
           <textarea
             value={notes}
@@ -401,6 +450,18 @@ function EditPersonaCard({
             placeholder="Freeform notes, observations, follow-ups..."
           />
         </EditField>
+
+        {extras.map((extra, i) => (
+          <EditField key={extra.label} label={extra.label} icon={StickyNote}>
+            <textarea
+              value={extra.content}
+              onChange={(e) => updateExtra(i, e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={Math.max(2, extra.content.split("\n").length)}
+              className="text-sm bg-transparent border-none outline-none w-full resize-none placeholder:text-muted-foreground"
+            />
+          </EditField>
+        ))}
       </CardContent>
     </Card>
   );

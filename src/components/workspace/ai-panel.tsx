@@ -13,6 +13,7 @@ import {
   Square,
   ChevronDown,
   Trash2,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,9 +24,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectFeatureTree, useProjectRoadmap } from "@/hooks/use-project-data";
+import { useConversation } from "@/hooks/use-conversation";
 import { ArtifactCard } from "@/components/ai/artifact-card";
 import { localChatStore } from "@/lib/chat-persistence";
 import { sanitizeUrl } from "@/lib/sanitize-url";
@@ -75,6 +88,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
         api: "/api/chat",
         body: () => ({
           ...bodyRef.current,
+          projectId,
           projectName: "Demo Project",
         }),
       }),
@@ -85,14 +99,44 @@ export function AiPanel({ projectId }: AiPanelProps) {
     transport,
   });
 
+  const { initialize, syncMessages: syncToDb, clearConversation } = useConversation(projectId);
+
   const didRestore = useRef(false);
   useEffect(() => {
     if (didRestore.current) return;
     didRestore.current = true;
-    const stored = localChatStore.load(projectId);
-    const toSet = stored.length > 0 ? stored : welcomeMessages;
-    setMessages(toSet as Parameters<typeof setMessages>[0]);
-  }, [projectId, setMessages]);
+
+    initialize().then((dbMessages) => {
+      // Deduplicate by id (safety net against stale data)
+      const dedup = (msgs: typeof dbMessages) => {
+        const seen = new Set<string>();
+        return msgs.filter((m) => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+      };
+
+      if (dbMessages.length > 0) {
+        const clean = dedup(dbMessages);
+        // DB has messages — use them and warm localStorage cache
+        setMessages(clean as Parameters<typeof setMessages>[0]);
+        localChatStore.save(projectId, clean as Parameters<typeof localChatStore.save>[1]);
+      } else {
+        // Fall back to localStorage, then welcome
+        const stored = dedup(localChatStore.load(projectId));
+        // If localStorage is corrupted (too many messages), discard it
+        if (stored.length > 200) {
+          localChatStore.clear(projectId);
+          setMessages(welcomeMessages as Parameters<typeof setMessages>[0]);
+        } else {
+          const toSet = stored.length > 0 ? stored : welcomeMessages;
+          setMessages(toSet as Parameters<typeof setMessages>[0]);
+        }
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize/setMessages are stable refs, only run once on mount
+  }, [projectId]);
 
   const isStreaming = status === "streaming";
   const isLoading = status === "submitted";
@@ -122,7 +166,9 @@ export function AiPanel({ projectId }: AiPanelProps) {
   useEffect(() => {
     if (status === "ready" && messages.length > 1) {
       localChatStore.save(projectId, messages as Parameters<typeof localChatStore.save>[1]);
+      syncToDb(messages as Parameters<typeof syncToDb>[0]);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- syncToDb is a stable ref
   }, [status, messages, projectId]);
 
   const submit = useCallback(() => {
@@ -150,25 +196,47 @@ export function AiPanel({ projectId }: AiPanelProps) {
           <span className="text-base font-semibold">Hannibal AI</span>
         </div>
         <div className="flex items-center gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                className="text-xs text-destructive focus:text-destructive"
-                onClick={() => {
-                  localChatStore.clear(projectId);
-                  setMessages(welcomeMessages as Parameters<typeof setMessages>[0]);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-2" />
-                Clear chat
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <AlertDialog>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    className="text-xs text-destructive focus:text-destructive"
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Clear chat
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear chat history?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will erase all AI conversation history for this project. The AI will lose context of previous discussions, though it can still read your saved plans, PRDs, features, and other artifacts.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => {
+                    localChatStore.clear(projectId);
+                    clearConversation();
+                    setMessages(welcomeMessages as Parameters<typeof setMessages>[0]);
+                  }}
+                >
+                  Clear
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button
             variant="ghost"
             size="icon"
@@ -184,7 +252,9 @@ export function AiPanel({ projectId }: AiPanelProps) {
       <div className="relative flex-1 min-h-0">
         <div className="h-full overflow-y-auto" ref={scrollRef} onScroll={handleScroll}>
           <div className="space-y-4 pb-4 px-4 py-3 w-full min-w-0">
-            {messages.map((message) => (
+            {messages.filter((message, index, arr) =>
+              arr.findIndex((m) => m.id === message.id) === index
+            ).map((message) => (
               <div key={message.id} className="space-y-1">
                 {message.role === "user" ? (
                   <div className="flex justify-end">
@@ -384,6 +454,55 @@ function renderToolPart(tool: ToolInfo, key: number, projectId: string) {
         icon={Globe}
         label="Researching"
         detail={query ? `"${query}"` : undefined}
+      />
+    );
+  }
+
+  if (tool.toolName === "readArtifact") {
+    const artifactId = (tool.input?.artifactId as string) ?? "";
+    if (isComplete) {
+      const result = tool.output as { content?: string; error?: string };
+      // Extract artifact label from the serialized content (e.g. ### [Plan] "Title")
+      const match = result.content?.match(/\[(\w[\w ]*)\]\s*"([^"]+)"/);
+      const label = match ? `${match[1]}: ${match[2]}` : artifactId;
+      return (
+        <div
+          key={key}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground py-1"
+        >
+          <BookOpen className="h-3 w-3" />
+          Read: {label}
+        </div>
+      );
+    }
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={BookOpen}
+        label="Reading artifact"
+        detail={artifactId || undefined}
+      />
+    );
+  }
+
+  if (tool.toolName === "readAllArtifacts") {
+    if (isComplete) {
+      const result = tool.output as { count?: number };
+      return (
+        <div
+          key={key}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground py-1"
+        >
+          <BookOpen className="h-3 w-3" />
+          Read all artifacts ({result.count ?? "?"})
+        </div>
+      );
+    }
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={BookOpen}
+        label="Reading all artifacts"
       />
     );
   }

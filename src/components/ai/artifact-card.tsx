@@ -240,6 +240,10 @@ function ArtifactPreview({ artifact }: { artifact: Artifact }) {
           {persona.goals.length > 0 && <ListSection label="Goals" items={persona.goals} />}
           {persona.frustrations.length > 0 && <ListSection label="Frustrations" items={persona.frustrations} />}
           {persona.behaviors.length > 0 && <ListSection label="Behaviors" items={persona.behaviors} />}
+          {persona.decisionMakingContext && <Section label="Decision-Making Context" content={persona.decisionMakingContext} />}
+          {persona.extras.map((extra) => (
+            <Section key={extra.label} label={extra.label} content={extra.content} />
+          ))}
           {persona.quote && <p className="italic text-muted-foreground">"{persona.quote}"</p>}
         </div>
       );
@@ -260,6 +264,10 @@ function ArtifactPreview({ artifact }: { artifact: Artifact }) {
           {comp.weaknesses.length > 0 && <ListSection label="Weaknesses" items={comp.weaknesses} />}
           {comp.pricing && <Section label="Pricing" content={comp.pricing} />}
           {comp.featureGaps.length > 0 && <ListSection label="Feature Gaps" items={comp.featureGaps} />}
+          {comp.strategicTrajectory && <Section label="Strategic Trajectory" content={comp.strategicTrajectory} />}
+          {comp.extras.map((extra) => (
+            <Section key={extra.label} label={extra.label} content={extra.content} />
+          ))}
         </div>
       );
     }

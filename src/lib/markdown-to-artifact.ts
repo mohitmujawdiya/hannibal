@@ -103,6 +103,36 @@ function extractParagraphText(section: string): string {
     .trim();
 }
 
+// ─── Catch-all for unrecognized sections ────────────────────────────
+
+export type ExtraSection = { label: string; content: string };
+
+/** Extract all top-level bold-labeled sections whose label isn't in `knownLabels`. */
+function extractUnrecognizedSections(
+  md: string,
+  knownLabels: string[],
+): ExtraSection[] {
+  const knownSet = new Set(knownLabels.map((l) => l.toLowerCase()));
+  const extras: ExtraSection[] = [];
+
+  // Match **Label:** at the start of a line
+  const labelPattern = /^\*\*([^*]+):\*\*\s*(.*)/gm;
+  let match;
+  while ((match = labelPattern.exec(md)) !== null) {
+    const label = match[1].trim();
+    if (knownSet.has(label.toLowerCase())) continue;
+
+    // Inline value (same line as label) + block content (lines below)
+    const inlineValue = match[2].trim();
+    const blockValue = extractBoldText(md, label);
+    const content = [inlineValue, blockValue].filter(Boolean).join("\n");
+    if (content) {
+      extras.push({ label, content });
+    }
+  }
+  return extras;
+}
+
 // ─── Plan parser ─────────────────────────────────────────────────────
 
 export type ParsedPlan = {
@@ -165,8 +195,15 @@ export type ParsedPersona = {
   goals: string[];
   frustrations: string[];
   behaviors: string[];
+  decisionMakingContext: string;
   notes: string;
+  extras: ExtraSection[];
 };
+
+const PERSONA_KNOWN_LABELS = [
+  "Demographics", "Tech Proficiency", "Goals", "Frustrations",
+  "Behaviors", "Decision-Making Context", "Notes",
+];
 
 export function parsePersonaMarkdown(content: string): ParsedPersona {
   return {
@@ -177,7 +214,9 @@ export function parsePersonaMarkdown(content: string): ParsedPersona {
     goals: extractBoldList(content, "Goals"),
     frustrations: extractBoldList(content, "Frustrations"),
     behaviors: extractBoldList(content, "Behaviors"),
+    decisionMakingContext: extractBoldText(content, "Decision-Making Context"),
     notes: extractBoldText(content, "Notes"),
+    extras: extractUnrecognizedSections(content, PERSONA_KNOWN_LABELS),
   };
 }
 
@@ -191,8 +230,15 @@ export type ParsedCompetitor = {
   strengths: string[];
   weaknesses: string[];
   featureGaps: string[];
+  strategicTrajectory: string;
   notes: string;
+  extras: ExtraSection[];
 };
+
+const COMPETITOR_KNOWN_LABELS = [
+  "URL", "Positioning", "Pricing", "Strengths",
+  "Weaknesses", "Feature Gaps", "Strategic Trajectory", "Notes",
+];
 
 export function parseCompetitorMarkdown(content: string): ParsedCompetitor {
   return {
@@ -203,7 +249,9 @@ export function parseCompetitorMarkdown(content: string): ParsedCompetitor {
     strengths: extractBoldList(content, "Strengths"),
     weaknesses: extractBoldList(content, "Weaknesses"),
     featureGaps: extractBoldList(content, "Feature Gaps"),
+    strategicTrajectory: extractBoldText(content, "Strategic Trajectory"),
     notes: extractBoldText(content, "Notes"),
+    extras: extractUnrecognizedSections(content, COMPETITOR_KNOWN_LABELS),
   };
 }
 

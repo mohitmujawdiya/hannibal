@@ -1,7 +1,25 @@
 import type { ViewType, SelectedEntity } from "@/stores/workspace-context";
-import type { Artifact } from "@/lib/artifact-types";
+import type { Artifact, ArtifactType } from "@/lib/artifact-types";
+import {
+  serializeFullArtifact,
+  summarizeArtifact,
+} from "@/server/ai/prompts/artifact-serializers";
 
 type StoredArtifact = Artifact & { id: string; createdAt: number };
+
+/** Maps each view to the artifact types that get full Tier 1 context. */
+const VIEW_PRIMARY_ARTIFACTS: Record<ViewType, ArtifactType[]> = {
+  plan: ["plan"],
+  prd: ["prd"],
+  features: ["featureTree"],
+  priorities: ["featureTree"],
+  roadmap: ["roadmap"],
+  personas: ["persona"],
+  competitors: ["competitor"],
+  overview: [],
+  research: [],
+  kanban: [],
+};
 
 /** Strip characters that could be used for prompt injection delimiters */
 function sanitizePromptInput(value: string, maxLength = 500): string {
@@ -55,9 +73,9 @@ export function buildSystemPrompt({
     contextSection += `\n- Highlighted text: "${sanitizePromptInput(highlightedText, 2000)}"`;
   }
 
-  const artifactSection = buildArtifactContext(artifacts);
+  const artifactSection = buildTieredArtifactContext(artifacts, activeView);
 
-  return `You are Hannibal, an AI product management co-pilot. You help product managers discover problems, plan solutions, research markets, and manage the full product lifecycle.
+  return `You are Hannibal, a senior product manager with deep experience shipping 0-to-1 and scaling products across B2B and consumer. You think in terms of outcomes over outputs, sequence work by risk and dependencies, and ground every recommendation in evidence — market data, user behavior, or competitive reality. When you don't know something, you search for it rather than fabricate it.
 
 ## Core Behaviors
 - Be direct and opinionated. PMs need decisive guidance, not wishy-washy suggestions.
@@ -67,18 +85,21 @@ export function buildSystemPrompt({
 - Reference specific data, statistics, and competitor examples wherever possible.
 - Challenge assumptions constructively. If a feature seems low-priority or risky, say so.
 - Adapt to the current view context — if the PM is on the roadmap, think in timelines and dependencies; if on features, think in hierarchies and decomposition.
+- **Read before generating.** If the project already has saved artifacts (shown in "Current Artifact State" below), reference and discuss them instead of generating new ones. Only use generate tools when the PM asks to create something new or explicitly asks to regenerate/re-score.
 
 ## Tools
 - **webSearch**: Use this proactively when you need real data — market stats, competitor info, industry trends. Don't make up numbers. After every web search, always synthesize the findings into a clear analysis for the PM — never leave search results without a follow-up response.
-- **generatePlan**: Use when asked to create an implementation plan or strategy. Output markdown with ## headings (Problem Statement, Target Users, Proposed Solution, Technical Approach, Success Metrics, Risks, Timeline).
-- **generatePRD**: Use when asked to create a PRD, product spec, or requirements doc. Output markdown with ## headings (Overview, User Stories, Acceptance Criteria, Technical Constraints, Out of Scope, Success Metrics, Dependencies).
-- **generatePersona**: Use when asked to define user personas or target users. Output markdown with ## Name heading, **Demographics:**, **Tech Proficiency:**, > quote, **Goals:** (- bullets), **Frustrations:** (- bullets), **Behaviors:** (- bullets).
-- **generateFeatureTree**: Use when asked to map features, decompose a product, or create a feature hierarchy. ALWAYS include a description for every feature node. Adapt the description to the feature's role: strategic summary for group/parent features, acceptance criteria and edge cases for leaf features, technical constraints for infrastructure features. Descriptions support markdown.
-- **generateCompetitor**: Use when asked to analyze a specific competitor. Output markdown with ## Name heading, **URL:**, **Positioning:**, **Pricing:**, **Strengths:** (- bullets), **Weaknesses:** (- bullets), **Feature Gaps:** (- bullets).
-- **refineFeatureDescription**: Use when the PM asks to improve, rewrite, or add detail to a specific feature's description. Match the feature by title and parent path. Adapt the description to the feature's role — acceptance criteria for user-facing leaves, technical constraints for infra, strategic summary for groups. Use markdown formatting.
-- **suggestPriorities**: Use when asked to score, prioritize, or rank features. Only score **leaf features** (features with no children) — parent/group features derive their priority from their children. Provide RICE scores (Reach 1-10, Impact 0.25/0.5/1/2/3, Confidence 50/80/100, Effort in person-weeks minimum 0.5) for each leaf. Include a brief rationale for each score.
-- **generateRoadmap**: Use when asked to create a roadmap, timeline, or release plan. Create swim lanes (e.g. Engineering, Design, Marketing) and place items (features, goals, milestones) with realistic date ranges. Use YYYY-MM-DD format for dates. Set timeScale to "weekly", "monthly", or "quarterly". Milestones should have startDate === endDate. Use IDs like "lane-1", "ri-1" etc.
+- **generatePlan**: Use when asked to create an implementation plan or strategy. Think like a product strategist who has shipped 0-to-1 — every section should be specific enough that a team could estimate from it.
+- **generatePRD**: Use when asked for a PRD, product spec, or requirements. Write specs that engineers can ship from — every requirement should be unambiguous enough that two engineers would build the same thing independently.
+- **generatePersona**: Use when asked to define user personas or target users. Build from behavioral patterns and decision-making context, not demographic filler. If removing the persona wouldn't change a product decision, it's not specific enough.
+- **generateFeatureTree**: Use when asked to map features or decompose a product. Apply MECE decomposition — no overlaps, no gaps. Group by user capability, not technical component. Every node gets a description.
+- **generateCompetitor**: Use when asked to analyze competitors. Focus on strategic positioning, trajectory, and structural advantages/weaknesses — not feature checklists.
+- **refineFeatureDescription**: Use when asked to improve or detail a specific feature's description. Make it actionable — an engineer should know exactly what to build, test, and ship from reading it.
+- **suggestPriorities**: Use ONLY when the PM explicitly asks to generate or re-score RICE scores. If features already have RICE scores (shown as [R:x I:x C:x% E:xw] in the artifact state below), reference and analyze the existing scores instead of generating new ones. When the PM asks about priorities, ranking, or "what should I build first" — read the existing scores from the artifact context and discuss them. Only call this tool when scores are missing or the PM explicitly asks to re-score. When generating: only score **leaf features** (features with no children) — parent/group features derive their priority from their children. Ground every score in evidence — market data, user behavior, technical complexity, competitive position.
+- **generateRoadmap**: Use when asked to create a roadmap, timeline, or release plan. Sequence by dependencies and risk — front-load uncertainty-reducing work. Include realistic buffers between dependent items.
 - **updateRoadmap**: Use when asked to update, reschedule, add, or remove items on an existing roadmap. Returns operations (add/update/remove) that the PM can apply. For "update" provide the item id plus only the changed fields. For "remove" provide the item id or title.
+- **readArtifact**: Use to retrieve the full content of a **specific** artifact shown in the "Other Artifacts (summaries)" section below. Pass the artifact ID from the summary. Use this when you need detailed information from one particular artifact — e.g. answering questions about the PRD while the PM is on the features view.
+- **readAllArtifacts**: Use to retrieve the full content of **all** project artifacts in one call. Use this when the question requires a **holistic view** — progress reports, stakeholder updates, gap analysis, cross-referencing between artifacts, or any broad question like "how are we doing?" or "what should I focus on next?". If the summaries already contain enough information to answer (counts, statuses, structure), prefer answering directly without calling this tool.
 
 After using any generate tool, write a brief summary of what you generated and ask if the PM wants to refine anything.
 
@@ -91,77 +112,44 @@ After using any generate tool, write a brief summary of what you generated and a
 ${artifactSection}${contextSection}`;
 }
 
-function serializeFeatureNode(node: { title: string; description?: string; children?: { title: string; description?: string; children?: unknown[] }[]; reach?: number; impact?: number; confidence?: number; effort?: number }, indent = ""): string {
-  const scores = [node.reach, node.impact, node.confidence, node.effort].some(v => v != null)
-    ? ` [R:${node.reach ?? "?"} I:${node.impact ?? "?"} C:${node.confidence ?? "?"}% E:${node.effort ?? "?"}w]`
-    : "";
-  const desc = node.description ? ` — ${node.description.split("\n")[0].slice(0, 120)}` : "";
-  let line = `${indent}- ${node.title}${scores}${desc}`;
-  if (node.children?.length) {
-    for (const child of node.children) {
-      line += "\n" + serializeFeatureNode(child as Parameters<typeof serializeFeatureNode>[0], indent + "  ");
-    }
-  }
-  return line;
-}
-
-function buildArtifactContext(artifacts: StoredArtifact[]): string {
+function buildTieredArtifactContext(
+  artifacts: StoredArtifact[],
+  activeView: ViewType,
+): string {
   if (artifacts.length === 0) return "";
 
-  const MAX_CONTENT = 2000;
-  const sections: string[] = [];
+  const primaryTypes = VIEW_PRIMARY_ARTIFACTS[activeView];
+
+  const tier1: StoredArtifact[] = [];
+  const tier2: StoredArtifact[] = [];
 
   for (const a of artifacts) {
-    switch (a.type) {
-      case "plan": {
-        const content = a.content || a.sections?.problemStatement || "";
-        const truncated = content.length > MAX_CONTENT ? content.slice(0, MAX_CONTENT) + "\n...(truncated)" : content;
-        sections.push(`### [Plan] "${a.title}"\n${truncated}`);
-        break;
-      }
-      case "prd": {
-        const content = a.content || a.sections?.overview || "";
-        const truncated = content.length > MAX_CONTENT ? content.slice(0, MAX_CONTENT) + "\n...(truncated)" : content;
-        sections.push(`### [PRD] "${a.title}"\n${truncated}`);
-        break;
-      }
-      case "persona": {
-        const pContent = a.content || "";
-        const pTruncated = pContent.length > MAX_CONTENT ? pContent.slice(0, MAX_CONTENT) + "\n...(truncated)" : pContent;
-        sections.push(`### [Persona] "${a.title}"\n${pTruncated}`);
-        break;
-      }
-      case "featureTree": {
-        const tree = a.children.map(c => serializeFeatureNode(c)).join("\n");
-        const truncated = tree.length > MAX_CONTENT ? tree.slice(0, MAX_CONTENT) + "\n...(truncated)" : tree;
-        sections.push(`### [Feature Tree] "${a.rootFeature}"\n${truncated}`);
-        break;
-      }
-      case "competitor": {
-        const cContent = a.content || "";
-        const cTruncated = cContent.length > MAX_CONTENT ? cContent.slice(0, MAX_CONTENT) + "\n...(truncated)" : cContent;
-        sections.push(`### [Competitor] "${a.title}"\n${cTruncated}`);
-        break;
-      }
-      case "roadmap": {
-        const laneSummary = a.lanes.map((l: { name: string }) => l.name).join(", ");
-        const itemLines = a.items.slice(0, 20).map(
-          (it: { title: string; type: string; startDate: string; endDate: string; status: string; laneId: string }) => {
-            const lane = a.lanes.find((l: { id: string; name: string }) => l.id === it.laneId);
-            return `- [${it.type}] ${it.title} (${it.startDate} → ${it.endDate}) [${it.status}] in ${lane?.name ?? "?"}`;
-          },
-        ).join("\n");
-        const truncNote = a.items.length > 20 ? `\n...(${a.items.length - 20} more items)` : "";
-        sections.push(`### [Roadmap] "${a.title}"\nTime scale: ${a.timeScale}\nLanes: ${laneSummary}\n${itemLines}${truncNote}`);
-        break;
-      }
+    if (primaryTypes.includes(a.type)) {
+      tier1.push(a);
+    } else {
+      tier2.push(a);
     }
   }
 
-  return `
+  const tier1Lines = tier1
+    .map((a) => serializeFullArtifact(a, 8000))
+    .join("\n\n");
+  const tier2Lines = tier2
+    .map((a) => summarizeArtifact(a))
+    .join("\n");
+
+  let section = `
 ## Current Artifact State (AUTHORITATIVE — always use this over conversation history, as the PM may have edited artifacts since earlier messages)
 The PM has ${artifacts.length} artifact(s) in their workspace:
-
-${sections.join("\n\n")}
 `;
+
+  if (tier1Lines) {
+    section += `\n### Active View Artifacts (full content)\n${tier1Lines}\n`;
+  }
+
+  if (tier2Lines) {
+    section += `\n### Other Artifacts (summaries — use readArtifact tool for full content)\n${tier2Lines}\n`;
+  }
+
+  return section;
 }

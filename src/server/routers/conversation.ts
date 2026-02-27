@@ -1,10 +1,87 @@
 import { z } from "zod/v3";
 import { TRPCError } from "@trpc/server";
+import type { Prisma } from "@/generated/prisma/client";
 import { MessageRole } from "@/generated/prisma/client";
 import { protectedProcedure, router } from "../trpc";
 import { assertProjectOwnership, assertResourceOwnership } from "../services/auth";
 
+const MAX_SYNC_MESSAGES = 200;
+
 export const conversationRouter = router({
+  getOrCreate: protectedProcedure
+    .input(z.object({ projectId: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
+
+      // Find most recent conversation with messages (capped at 200)
+      const existing = await ctx.db.conversation.findFirst({
+        where: { projectId: input.projectId },
+        orderBy: { updatedAt: "desc" },
+        include: {
+          messages: { orderBy: { createdAt: "asc" }, take: MAX_SYNC_MESSAGES },
+        },
+      });
+
+      if (existing) return existing;
+
+      // Create a fresh conversation
+      return ctx.db.conversation.create({
+        data: { projectId: input.projectId },
+        include: {
+          messages: { orderBy: { createdAt: "asc" } },
+        },
+      });
+    }),
+
+  syncMessages: protectedProcedure
+    .input(
+      z.object({
+        conversationId: z.string().cuid(),
+        messages: z
+          .array(
+            z.object({
+              sdkId: z.string(),
+              role: z.nativeEnum(MessageRole),
+              content: z.string().max(200_000),
+              parts: z.array(z.unknown()).optional(),
+            }),
+          )
+          .max(MAX_SYNC_MESSAGES),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "conversation", input.conversationId, ctx.userId);
+
+      await ctx.db.$transaction(async (tx) => {
+        // Delete all existing messages
+        await tx.message.deleteMany({
+          where: { conversationId: input.conversationId },
+        });
+
+        // Create fresh messages
+        if (input.messages.length > 0) {
+          await tx.message.createMany({
+            data: input.messages.map((msg, i) => ({
+              role: msg.role,
+              content: msg.content,
+              metadata: { sdkId: msg.sdkId, parts: msg.parts ?? [] } as Prisma.InputJsonValue,
+              conversationId: input.conversationId,
+              // Stagger createdAt so ordering is deterministic
+              createdAt: new Date(Date.now() + i),
+            })),
+          });
+        }
+
+        // Touch conversation's updatedAt
+        await tx.conversation.update({
+          where: { id: input.conversationId },
+          data: { updatedAt: new Date() },
+        });
+      });
+
+      return { success: true };
+    }),
+
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .query(async ({ ctx, input }) => {

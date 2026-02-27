@@ -17,6 +17,7 @@ import {
   Globe,
   Crosshair,
   StickyNote,
+  TrendingUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectCompetitors } from "@/hooks/use-project-data";
 import { parseCompetitorMarkdown } from "@/lib/markdown-to-artifact";
-import type { ParsedCompetitor } from "@/lib/markdown-to-artifact";
+import type { ParsedCompetitor, ExtraSection } from "@/lib/markdown-to-artifact";
 import { sanitizeUrl } from "@/lib/sanitize-url";
 
 function buildCompetitorMarkdown(fields: ParsedCompetitor): string {
@@ -45,8 +46,18 @@ function buildCompetitorMarkdown(fields: ParsedCompetitor): string {
   if (fields.featureGaps.length > 0) {
     parts.push(`**Feature Gaps:**\n${fields.featureGaps.map((g) => `- ${g}`).join("\n")}`);
   }
+  if (fields.strategicTrajectory?.trim()) {
+    parts.push(`**Strategic Trajectory:**\n${fields.strategicTrajectory}`);
+  }
   if (fields.notes?.trim()) {
     parts.push(`**Notes:**\n${fields.notes}`);
+  }
+  for (const extra of fields.extras) {
+    if (extra.content.trim()) {
+      parts.push(extra.content.includes("\n")
+        ? `**${extra.label}:**\n${extra.content}`
+        : `**${extra.label}:** ${extra.content}`);
+    }
   }
   return parts.join("\n\n");
 }
@@ -238,6 +249,16 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                       )}
                     </div>
 
+                    {parsed.strategicTrajectory && (
+                      <div className="mt-4">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-cyan-400 mb-1.5">
+                          <TrendingUp className="h-3 w-3" />
+                          Strategic Trajectory
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-3">{parsed.strategicTrajectory}</p>
+                      </div>
+                    )}
+
                     {parsed.notes && (
                       <div className="mt-4">
                         <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
@@ -247,6 +268,15 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-3">{parsed.notes}</p>
                       </div>
                     )}
+
+                    {parsed.extras.map((extra) => (
+                      <div key={extra.label} className="mt-4">
+                        <div className="text-xs font-medium text-muted-foreground mb-1.5">
+                          {extra.label}
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-3">{extra.content}</p>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
               );
@@ -275,7 +305,13 @@ function EditCompetitorCard({
   const [strengths, setStrengths] = useState(listToLines(parsed.strengths));
   const [weaknesses, setWeaknesses] = useState(listToLines(parsed.weaknesses));
   const [featureGaps, setFeatureGaps] = useState(listToLines(parsed.featureGaps));
+  const [strategicTrajectory, setStrategicTrajectory] = useState(parsed.strategicTrajectory);
   const [notes, setNotes] = useState(parsed.notes);
+  const [extras, setExtras] = useState<ExtraSection[]>(parsed.extras);
+
+  const updateExtra = (index: number, content: string) => {
+    setExtras((prev) => prev.map((e, i) => (i === index ? { ...e, content } : e)));
+  };
 
   const handleSave = () => {
     onSave({
@@ -286,7 +322,9 @@ function EditCompetitorCard({
       strengths: linesToList(strengths),
       weaknesses: linesToList(weaknesses),
       featureGaps: linesToList(featureGaps),
+      strategicTrajectory,
       notes,
+      extras,
     });
   };
 
@@ -398,6 +436,17 @@ function EditCompetitorCard({
           />
         </div>
 
+        <EditField label="Strategic Trajectory" icon={TrendingUp}>
+          <textarea
+            value={strategicTrajectory}
+            onChange={(e) => setStrategicTrajectory(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={Math.max(2, strategicTrajectory.split("\n").length)}
+            className="text-sm bg-transparent border-none outline-none w-full resize-none placeholder:text-muted-foreground"
+            placeholder="Recent moves, hiring signals, strategic direction, structural constraints..."
+          />
+        </EditField>
+
         <EditField label="Notes" icon={StickyNote}>
           <textarea
             value={notes}
@@ -408,6 +457,18 @@ function EditCompetitorCard({
             placeholder="Freeform notes, observations, follow-ups..."
           />
         </EditField>
+
+        {extras.map((extra, i) => (
+          <EditField key={extra.label} label={extra.label} icon={StickyNote}>
+            <textarea
+              value={extra.content}
+              onChange={(e) => updateExtra(i, e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={Math.max(2, extra.content.split("\n").length)}
+              className="text-sm bg-transparent border-none outline-none w-full resize-none placeholder:text-muted-foreground"
+            />
+          </EditField>
+        ))}
       </CardContent>
     </Card>
   );
