@@ -446,9 +446,11 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
     }
   }, [dbTree]);
 
-  const tree = dbTree
-    ? { ...dbTree, children: localChildren ?? dbTree.children }
-    : null;
+  const effectiveChildren = localChildren ?? dbTree?.children ?? [];
+  const tree = useMemo(
+    () => (dbTree ? { ...dbTree, children: effectiveChildren } : null),
+    [dbTree, effectiveChildren],
+  );
 
   const allFeatures = useMemo(
     () => (tree ? flattenTree(tree.children) : []),

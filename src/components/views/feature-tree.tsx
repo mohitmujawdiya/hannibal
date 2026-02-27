@@ -161,10 +161,13 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
     }
   }, [dbTree]);
 
-  const tree: FeatureTreeArtifact | null =
-    localRoot != null && localChildren != null
-      ? { type: "featureTree", rootFeature: localRoot, children: localChildren }
-      : dbTree;
+  const tree: FeatureTreeArtifact | null = useMemo(
+    () =>
+      localRoot != null && localChildren != null
+        ? { type: "featureTree", rootFeature: localRoot, children: localChildren }
+        : dbTree,
+    [localRoot, localChildren, dbTree],
+  );
   const children = tree?.children ?? [];
 
   const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo<FeatureNode[]>();
