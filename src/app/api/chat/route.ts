@@ -9,6 +9,7 @@ import {
 import { buildSystemPrompt } from "@/server/ai/prompts/system";
 import { webSearchTool } from "@/server/ai/tools/web-search";
 import { artifactTools } from "@/server/ai/tools/generate-artifact";
+import { chatLimiter, getRateLimitIdentifier, rateLimitResponse } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
@@ -16,6 +17,12 @@ export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  if (chatLimiter) {
+    const id = getRateLimitIdentifier(userId, req);
+    const { success, reset } = await chatLimiter.limit(id);
+    if (!success) return rateLimitResponse(reset);
   }
 
   const body = await req.json();
