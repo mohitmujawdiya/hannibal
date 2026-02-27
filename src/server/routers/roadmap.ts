@@ -101,6 +101,28 @@ export const roadmapRouter = router({
       });
     }),
 
+  restore: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmap", input.id, ctx.userId);
+      return ctx.db.roadmap.update({
+        where: { id: input.id },
+        data: { deletedAt: null },
+      });
+    }),
+
+  hardDelete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "roadmap", input.id, ctx.userId);
+      const roadmap = await ctx.db.roadmap.findUnique({ where: { id: input.id } });
+      if (!roadmap) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!roadmap.deletedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Must be soft-deleted first" });
+      }
+      return ctx.db.roadmap.delete({ where: { id: input.id } });
+    }),
+
   syncFull: protectedProcedure
     .input(
       z.object({

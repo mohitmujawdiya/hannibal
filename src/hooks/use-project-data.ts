@@ -25,6 +25,7 @@ export function useProjectPlans(projectId: string) {
   const restoreMutation = trpc.plan.restore.useMutation({
     onSuccess: () => utils.plan.list.invalidate({ projectId }),
   });
+  const hardDeleteMutation = trpc.plan.hardDelete.useMutation();
 
   const create = useCallback(
     (input: { title: string; content?: string }) =>
@@ -40,16 +41,23 @@ export function useProjectPlans(projectId: string) {
 
   const remove = useCallback(
     (id: string) => {
+      let cancelled = false;
       deleteMutation.mutate({ id });
       toast("Plan deleted", {
         action: {
           label: "Undo",
-          onClick: () => restoreMutation.mutate({ id }),
+          onClick: () => {
+            cancelled = true;
+            restoreMutation.mutate({ id });
+          },
         },
-        duration: 5000,
+        onDismiss: () => {
+          if (!cancelled) hardDeleteMutation.mutate({ id });
+        },
+        duration: 10000,
       });
     },
-    [deleteMutation, restoreMutation],
+    [deleteMutation, restoreMutation, hardDeleteMutation],
   );
 
   return {
@@ -79,6 +87,7 @@ export function useProjectPrds(projectId: string) {
   const restoreMutation = trpc.prd.restore.useMutation({
     onSuccess: () => utils.prd.list.invalidate({ projectId }),
   });
+  const hardDeleteMutation = trpc.prd.hardDelete.useMutation();
 
   const create = useCallback(
     (input: { title: string; content?: string }) =>
@@ -94,16 +103,23 @@ export function useProjectPrds(projectId: string) {
 
   const remove = useCallback(
     (id: string) => {
+      let cancelled = false;
       deleteMutation.mutate({ id });
       toast("PRD deleted", {
         action: {
           label: "Undo",
-          onClick: () => restoreMutation.mutate({ id }),
+          onClick: () => {
+            cancelled = true;
+            restoreMutation.mutate({ id });
+          },
         },
-        duration: 5000,
+        onDismiss: () => {
+          if (!cancelled) hardDeleteMutation.mutate({ id });
+        },
+        duration: 10000,
       });
     },
-    [deleteMutation, restoreMutation],
+    [deleteMutation, restoreMutation, hardDeleteMutation],
   );
 
   return {
@@ -133,6 +149,7 @@ export function useProjectPersonas(projectId: string) {
   const restoreMutation = trpc.persona.restore.useMutation({
     onSuccess: () => utils.persona.list.invalidate({ projectId }),
   });
+  const hardDeleteMutation = trpc.persona.hardDelete.useMutation();
 
   const create = useCallback(
     (input: { name: string; content?: string }) =>
@@ -148,16 +165,23 @@ export function useProjectPersonas(projectId: string) {
 
   const remove = useCallback(
     (id: string) => {
+      let cancelled = false;
       deleteMutation.mutate({ id });
       toast("Persona deleted", {
         action: {
           label: "Undo",
-          onClick: () => restoreMutation.mutate({ id }),
+          onClick: () => {
+            cancelled = true;
+            restoreMutation.mutate({ id });
+          },
         },
-        duration: 5000,
+        onDismiss: () => {
+          if (!cancelled) hardDeleteMutation.mutate({ id });
+        },
+        duration: 10000,
       });
     },
-    [deleteMutation, restoreMutation],
+    [deleteMutation, restoreMutation, hardDeleteMutation],
   );
 
   return {
@@ -187,6 +211,7 @@ export function useProjectCompetitors(projectId: string) {
   const restoreMutation = trpc.competitor.restore.useMutation({
     onSuccess: () => utils.competitor.list.invalidate({ projectId }),
   });
+  const hardDeleteMutation = trpc.competitor.hardDelete.useMutation();
 
   const create = useCallback(
     (input: { name: string; content?: string }) =>
@@ -202,16 +227,23 @@ export function useProjectCompetitors(projectId: string) {
 
   const remove = useCallback(
     (id: string) => {
+      let cancelled = false;
       deleteMutation.mutate({ id });
       toast("Competitor deleted", {
         action: {
           label: "Undo",
-          onClick: () => restoreMutation.mutate({ id }),
+          onClick: () => {
+            cancelled = true;
+            restoreMutation.mutate({ id });
+          },
         },
-        duration: 5000,
+        onDismiss: () => {
+          if (!cancelled) hardDeleteMutation.mutate({ id });
+        },
+        duration: 10000,
       });
     },
-    [deleteMutation, restoreMutation],
+    [deleteMutation, restoreMutation, hardDeleteMutation],
   );
 
   return {
@@ -236,6 +268,10 @@ export function useProjectFeatureTree(projectId: string) {
   const deleteAllMutation = trpc.feature.deleteAll.useMutation({
     onSuccess: () => utils.feature.tree.invalidate({ projectId }),
   });
+  const restoreAllMutation = trpc.feature.restoreAll.useMutation({
+    onSuccess: () => utils.feature.tree.invalidate({ projectId }),
+  });
+  const hardDeleteAllMutation = trpc.feature.hardDeleteAll.useMutation();
 
   const tree = useMemo(
     () => (query.data ? dbFeatureTreeToArtifact(query.data) : null),
@@ -249,9 +285,22 @@ export function useProjectFeatureTree(projectId: string) {
   );
 
   const removeAll = useCallback(() => {
+    let cancelled = false;
     deleteAllMutation.mutate({ projectId });
-    toast("Feature tree deleted", { duration: 5000 });
-  }, [deleteAllMutation, projectId]);
+    toast("Feature tree deleted", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          cancelled = true;
+          restoreAllMutation.mutate({ projectId });
+        },
+      },
+      onDismiss: () => {
+        if (!cancelled) hardDeleteAllMutation.mutate({ projectId });
+      },
+      duration: 10000,
+    });
+  }, [deleteAllMutation, restoreAllMutation, hardDeleteAllMutation, projectId]);
 
   return {
     tree,
@@ -285,6 +334,10 @@ export function useProjectRoadmap(projectId: string) {
   const deleteMutation = trpc.roadmap.delete.useMutation({
     onSuccess: () => utils.roadmap.list.invalidate({ projectId }),
   });
+  const restoreMutation = trpc.roadmap.restore.useMutation({
+    onSuccess: () => utils.roadmap.list.invalidate({ projectId }),
+  });
+  const hardDeleteMutation = trpc.roadmap.hardDelete.useMutation();
 
   const roadmap = useMemo(
     () => (byIdQuery.data ? dbRoadmapToArtifact(byIdQuery.data) : null),
@@ -315,10 +368,23 @@ export function useProjectRoadmap(projectId: string) {
 
   const remove = useCallback(
     (id: string) => {
+      let cancelled = false;
       deleteMutation.mutate({ id });
-      toast("Roadmap deleted", { duration: 5000 });
+      toast("Roadmap deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            cancelled = true;
+            restoreMutation.mutate({ id });
+          },
+        },
+        onDismiss: () => {
+          if (!cancelled) hardDeleteMutation.mutate({ id });
+        },
+        duration: 10000,
+      });
     },
-    [deleteMutation],
+    [deleteMutation, restoreMutation, hardDeleteMutation],
   );
 
   return {

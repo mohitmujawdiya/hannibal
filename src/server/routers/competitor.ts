@@ -117,6 +117,18 @@ export const competitorRouter = router({
       });
     }),
 
+  hardDelete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "competitor", input.id, ctx.userId);
+      const competitor = await ctx.db.competitor.findUnique({ where: { id: input.id } });
+      if (!competitor) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!competitor.deletedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Must be soft-deleted first" });
+      }
+      return ctx.db.competitor.delete({ where: { id: input.id } });
+    }),
+
   markResearched: protectedProcedure
     .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ ctx, input }) => {

@@ -113,4 +113,16 @@ export const personaRouter = router({
         data: { deletedAt: null },
       });
     }),
+
+  hardDelete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "persona", input.id, ctx.userId);
+      const persona = await ctx.db.persona.findUnique({ where: { id: input.id } });
+      if (!persona) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!persona.deletedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Must be soft-deleted first" });
+      }
+      return ctx.db.persona.delete({ where: { id: input.id } });
+    }),
 });

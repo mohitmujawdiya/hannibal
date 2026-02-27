@@ -91,6 +91,18 @@ export const prdRouter = router({
       });
     }),
 
+  hardDelete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertResourceOwnership(ctx.db, "prd", input.id, ctx.userId);
+      const prd = await ctx.db.pRD.findUnique({ where: { id: input.id } });
+      if (!prd) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!prd.deletedAt) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Must be soft-deleted first" });
+      }
+      return ctx.db.pRD.delete({ where: { id: input.id } });
+    }),
+
   updateStatus: protectedProcedure
     .input(
       z.object({

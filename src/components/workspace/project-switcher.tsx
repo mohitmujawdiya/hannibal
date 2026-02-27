@@ -8,16 +8,6 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -46,9 +36,6 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
   const [newProjectName, setNewProjectName] = useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<{ id: string; name: string } | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingProject, setDeletingProject] = useState<{ id: string; name: string } | null>(null);
-
   const utils = trpc.useUtils();
   const { data: projects } = trpc.project.list.useQuery();
   const createMutation = trpc.project.create.useMutation({
@@ -68,19 +55,16 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
     },
   });
   const deleteMutation = trpc.project.delete.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       utils.project.list.invalidate();
-      toast.success("Project deleted");
-      if (variables.id === projectId) {
-        const remaining = projects?.filter((p) => p.id !== variables.id);
-        if (remaining && remaining.length > 0) {
-          router.push(`/${remaining[0].id}`);
-        } else {
-          router.push("/");
-        }
-      }
     },
   });
+  const restoreMutation = trpc.project.restore.useMutation({
+    onSuccess: () => {
+      utils.project.list.invalidate();
+    },
+  });
+  const hardDeleteMutation = trpc.project.hardDelete.useMutation();
 
   const currentProject = projects?.find((p) => p.id === projectId);
 
@@ -98,15 +82,36 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
   };
 
   const handleDelete = (project: { id: string; name: string }) => {
-    setDeletingProject(project);
-    setDeleteDialogOpen(true);
-  };
+    let cancelled = false;
 
-  const confirmDelete = () => {
-    if (!deletingProject) return;
-    deleteMutation.mutate({ id: deletingProject.id });
-    setDeleteDialogOpen(false);
-    setDeletingProject(null);
+    deleteMutation.mutate({ id: project.id }, {
+      onSuccess: () => {
+        if (project.id === projectId) {
+          const remaining = projects?.filter((p) => p.id !== project.id);
+          if (remaining && remaining.length > 0) {
+            router.push(`/${remaining[0].id}`);
+          } else {
+            router.push("/");
+          }
+        }
+
+        toast(`"${project.name}" deleted`, {
+          duration: 10000,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              cancelled = true;
+              restoreMutation.mutate({ id: project.id });
+            },
+          },
+          onDismiss: () => {
+            if (!cancelled) {
+              hardDeleteMutation.mutate({ id: project.id });
+            }
+          },
+        });
+      },
+    });
   };
 
   return (
@@ -221,29 +226,6 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
-        setDeleteDialogOpen(open);
-        if (!open) setDeletingProject(null);
-      }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete project?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete &ldquo;{deletingProject?.name}&rdquo;. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={confirmDelete}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Dialog open={editDialogOpen} onOpenChange={(open) => {
         setEditDialogOpen(open);

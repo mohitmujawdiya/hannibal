@@ -70,4 +70,33 @@ export const projectRouter = router({
         data: { deletedAt: new Date() },
       });
     }),
+
+  restore: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const project = await ctx.db.project.findUnique({ where: { id: input.id } });
+      if (!project) throw new TRPCError({ code: "NOT_FOUND" });
+      if (project.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" });
+
+      return ctx.db.project.update({
+        where: { id: input.id },
+        data: { deletedAt: null },
+      });
+    }),
+
+  hardDelete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const project = await ctx.db.project.findUnique({ where: { id: input.id } });
+      if (!project) throw new TRPCError({ code: "NOT_FOUND" });
+      if (project.userId !== ctx.userId) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!project.deletedAt) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Project must be soft-deleted before hard delete",
+        });
+      }
+
+      return ctx.db.project.delete({ where: { id: input.id } });
+    }),
 });
