@@ -62,8 +62,7 @@ export const planRouter = router({
     .mutation(async ({ ctx, input }) => {
       await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
       const existing = await ctx.db.plan.findFirst({
-        where: { projectId: input.projectId, deletedAt: null },
-        orderBy: { updatedAt: "desc" },
+        where: { projectId: input.projectId, title: input.title, deletedAt: null },
         select: { id: true },
       });
       if (existing) {

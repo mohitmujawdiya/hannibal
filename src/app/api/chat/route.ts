@@ -10,6 +10,7 @@ import { buildSystemPrompt } from "@/server/ai/prompts/system";
 import { webSearchTool } from "@/server/ai/tools/web-search";
 import { artifactTools } from "@/server/ai/tools/generate-artifact";
 import { createReadArtifactTool, createReadAllArtifactsTool } from "@/server/ai/tools/read-artifact";
+import { createEditPlanTool, createEditPrdTool } from "@/server/ai/tools/edit-artifact";
 import { askFollowUpTool } from "@/server/ai/tools/ask-follow-up";
 import { chatLimiter, getRateLimitIdentifier, rateLimitResponse } from "@/lib/rate-limit";
 import { loadProjectArtifacts } from "@/server/services/project-context";
@@ -78,6 +79,8 @@ export async function POST(req: Request) {
       ...artifactTools,
       readArtifact: createReadArtifactTool(allArtifacts),
       readAllArtifacts: createReadAllArtifactsTool(allArtifacts),
+      editPlan: createEditPlanTool(userId),
+      editPRD: createEditPrdTool(userId),
     },
     stopWhen: stepCountIs(5),
     temperature: 0.7,

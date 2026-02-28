@@ -2,7 +2,7 @@ import { tool, jsonSchema } from "ai";
 
 export const askFollowUpTool = tool({
   description:
-    "Ask the PM a strategic clarifying question with 2-4 options before generating an artifact. The question should uncover the MOST IMPORTANT missing context — the one thing that would change 80% of the output. Ask about differentiation, target user, scope, or strategic angle — NOT surface-level categorization. Never ask more than one follow-up per turn.",
+    "Ask the user a strategic clarifying question with 2-4 options before generating an artifact. The question should uncover the MOST IMPORTANT missing context — the one thing that would change 80% of the output. Ask about differentiation, target user, scope, or strategic angle — NOT surface-level categorization. Never ask more than one follow-up per turn.",
   inputSchema: jsonSchema<{
     question: string;
     options: Array<{ label: string; description: string }>;

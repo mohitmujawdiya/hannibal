@@ -14,6 +14,7 @@ type MarkdownDocProps = {
   minHeight?: string;
   /** Rendered next to Edit/Preview in the toolbar */
   toolbarActions?: React.ReactNode;
+  readOnly?: boolean;
 };
 
 export function MarkdownDoc({
@@ -23,9 +24,14 @@ export function MarkdownDoc({
   className,
   minHeight = "min-h-[200px]",
   toolbarActions,
+  readOnly,
 }: MarkdownDocProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    if (readOnly && isEditing) setIsEditing(false);
+  }, [readOnly, isEditing]);
 
   useEffect(() => {
     if (!isEditing) setLocalValue(value);
@@ -79,7 +85,7 @@ export function MarkdownDoc({
     <div className={cn("flex flex-col gap-2", className)}>
       <div className="flex items-center justify-end gap-2">
         {toolbarActions}
-        <button
+        {!readOnly && <button
           type="button"
           onClick={handleToggle}
           className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -99,7 +105,7 @@ export function MarkdownDoc({
             <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
           </svg>
           Edit
-        </button>
+        </button>}
       </div>
       <div
         className={cn(

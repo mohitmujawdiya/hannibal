@@ -9,7 +9,6 @@ import {
   Swords,
   Map,
   ChevronDown,
-  ChevronRight,
   ExternalLink,
   Loader2,
 } from "lucide-react";
@@ -105,6 +104,7 @@ function useSaveArtifact(projectId: string) {
 export function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId: string }) {
   const [expanded, setExpanded] = useState(false);
   const [pushed, setPushed] = useState(false);
+  const [pushedId, setPushedId] = useState<string | null>(null);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
   const { save, isPending } = useSaveArtifact(projectId);
   const meta = artifactMeta[artifact.type];
@@ -114,13 +114,23 @@ export function ArtifactCard({ artifact, projectId }: { artifact: Artifact; proj
 
   const handleSave = async () => {
     if (pushed) {
-      setActiveView(meta.view);
+      if ((artifact.type === "plan" || artifact.type === "prd") && pushedId) {
+        setActiveView(meta.view, { type: artifact.type, id: pushedId });
+      } else {
+        setActiveView(meta.view);
+      }
       return;
     }
     try {
-      await save(artifact);
+      const result = await save(artifact);
       setPushed(true);
-      setActiveView(meta.view);
+      const resultId = result && !Array.isArray(result) && "id" in result ? result.id : null;
+      if ((artifact.type === "plan" || artifact.type === "prd") && resultId) {
+        setPushedId(resultId);
+        setActiveView(meta.view, { type: artifact.type, id: resultId });
+      } else {
+        setActiveView(meta.view);
+      }
       toast.success(`${meta.label} saved`);
     } catch {
       toast.error("Failed to save — try again");
@@ -129,7 +139,10 @@ export function ArtifactCard({ artifact, projectId }: { artifact: Artifact; proj
 
   return (
     <Card className="bg-muted/50 border-border/50 overflow-hidden">
-      <CardHeader className="p-3 pb-2">
+      <CardHeader
+        className="p-3 pb-2 cursor-pointer select-none"
+        onClick={() => setExpanded(!expanded)}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 min-w-0">
             <Icon className={cn("h-4 w-4 mt-0.5 shrink-0", meta.color)} />
@@ -142,48 +155,43 @@ export function ArtifactCard({ artifact, projectId }: { artifact: Artifact; proj
               </CardTitle>
             </div>
           </div>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="shrink-0 p-0.5 rounded hover:bg-accent transition-colors"
-          >
-            {expanded ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )}
-          </button>
+          <ChevronDown className={cn(
+            "h-3.5 w-3.5 shrink-0 mt-0.5 text-muted-foreground transition-transform",
+            !expanded && "-rotate-90",
+          )} />
         </div>
       </CardHeader>
 
       {expanded && (
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-1">
           <ArtifactPreview artifact={artifact} />
-          <div className="mt-2">
-            <Button
-              size="sm"
-              variant={pushed ? "outline" : "secondary"}
-              className="h-7 text-xs w-full justify-center"
-              onClick={handleSave}
-              disabled={isPending}
-            >
-              {isPending ? (
-                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
-              ) : (
-                <ExternalLink className="h-3 w-3 shrink-0" />
-              )}
-              <span className="truncate">
-                {pushed ? `View in ${meta.label}` : `Save to ${meta.label}`}
-              </span>
-            </Button>
-          </div>
         </div>
       )}
 
       {!expanded && (
-        <CardDescription className="px-3 pb-3 text-xs line-clamp-2">
+        <CardDescription className="px-3 pb-1 text-xs line-clamp-2">
           {getArtifactSummary(artifact)}
         </CardDescription>
       )}
+
+      <div className="px-3 pb-3 pt-1">
+        <Button
+          size="sm"
+          variant={pushed ? "outline" : "secondary"}
+          className="h-7 text-xs w-full justify-center"
+          onClick={handleSave}
+          disabled={isPending}
+        >
+          {isPending ? (
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+          ) : (
+            <ExternalLink className="h-3 w-3 shrink-0" />
+          )}
+          <span className="truncate">
+            {pushed ? `View in ${meta.label}` : `Save to ${meta.label}`}
+          </span>
+        </Button>
+      </div>
     </Card>
   );
 }

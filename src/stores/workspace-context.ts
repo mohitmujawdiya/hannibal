@@ -18,6 +18,14 @@ export type SelectedEntity = {
   data?: unknown;
 } | null;
 
+export type AiEditState = {
+  documentType: "plan" | "prd";
+  documentId: string;
+  preEditContent: string;
+  streamingContent: string;
+  isComplete: boolean;
+};
+
 type WorkspaceContextState = {
   activeView: ViewType;
   selectedEntity: SelectedEntity;
@@ -25,7 +33,8 @@ type WorkspaceContextState = {
   sidebarOpen: boolean;
   aiPanelOpen: boolean;
   focusAiInput: number;
-  setActiveView: (view: ViewType) => void;
+  aiEdit: AiEditState | null;
+  setActiveView: (view: ViewType, entity?: SelectedEntity) => void;
   setSelectedEntity: (entity: SelectedEntity) => void;
   setHighlightedText: (text: string | null) => void;
   toggleSidebar: () => void;
@@ -33,6 +42,10 @@ type WorkspaceContextState = {
   setSidebarOpen: (open: boolean) => void;
   setAiPanelOpen: (open: boolean) => void;
   requestAiFocus: () => void;
+  startAiEdit: (params: { documentType: "plan" | "prd"; documentId: string; preEditContent: string }) => void;
+  updateAiEditContent: (content: string) => void;
+  completeAiEdit: () => void;
+  clearAiEdit: () => void;
 };
 
 export const useWorkspaceContext = create<WorkspaceContextState>((set) => ({
@@ -42,7 +55,8 @@ export const useWorkspaceContext = create<WorkspaceContextState>((set) => ({
   sidebarOpen: true,
   aiPanelOpen: true,
   focusAiInput: 0,
-  setActiveView: (view) => set({ activeView: view, selectedEntity: null }),
+  aiEdit: null,
+  setActiveView: (view, entity) => set({ activeView: view, selectedEntity: entity ?? null }),
   setSelectedEntity: (entity) => set({ selectedEntity: entity }),
   setHighlightedText: (text) => set({ highlightedText: text }),
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
@@ -50,4 +64,11 @@ export const useWorkspaceContext = create<WorkspaceContextState>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setAiPanelOpen: (open) => set({ aiPanelOpen: open }),
   requestAiFocus: () => set((s) => ({ aiPanelOpen: true, focusAiInput: s.focusAiInput + 1 })),
+  startAiEdit: ({ documentType, documentId, preEditContent }) =>
+    set({ aiEdit: { documentType, documentId, preEditContent, streamingContent: "", isComplete: false } }),
+  updateAiEditContent: (content) =>
+    set((s) => s.aiEdit ? { aiEdit: { ...s.aiEdit, streamingContent: content } } : {}),
+  completeAiEdit: () =>
+    set((s) => s.aiEdit ? { aiEdit: { ...s.aiEdit, isComplete: true } } : {}),
+  clearAiEdit: () => set({ aiEdit: null }),
 }));

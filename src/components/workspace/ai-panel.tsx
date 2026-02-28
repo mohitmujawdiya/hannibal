@@ -37,7 +37,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { useWorkspaceContext } from "@/stores/workspace-context";
+import { trpc } from "@/lib/trpc";
 import { useProjectFeatureTree, useProjectRoadmap } from "@/hooks/use-project-data";
 import { useConversation } from "@/hooks/use-conversation";
 import { ArtifactCard } from "@/components/ai/artifact-card";
@@ -199,6 +201,16 @@ export function AiPanel({ projectId }: AiPanelProps) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- syncToDb is a stable ref
   }, [status, messages, projectId]);
+
+  // Clean up incomplete AI edits when streaming stops (user clicks Stop or error)
+  useEffect(() => {
+    if (status === "ready") {
+      const edit = useWorkspaceContext.getState().aiEdit;
+      if (edit && !edit.isComplete) {
+        useWorkspaceContext.getState().clearAiEdit();
+      }
+    }
+  }, [status]);
 
   const submit = useCallback(() => {
     const text = input.trim();
@@ -683,6 +695,22 @@ function renderToolPart(
     );
   }
 
+  if (tool.toolName === "editPlan" || tool.toolName === "editPRD") {
+    return (
+      <div key={key}>
+        <EditToolBridge tool={tool} projectId={projectId} />
+        {isComplete ? (
+          <EditCompleteCard tool={tool} projectId={projectId} />
+        ) : (
+          <ToolProgressCard
+            icon={Sparkles}
+            label={tool.toolName === "editPlan" ? "Editing plan" : "Editing PRD"}
+          />
+        )}
+      </div>
+    );
+  }
+
   if (tool.toolName in ARTIFACT_TOOL_LABELS) {
     if (isComplete && tool.output) {
       const result = tool.output as { artifact?: Artifact };
@@ -704,6 +732,136 @@ function renderToolPart(
   }
 
   return null;
+}
+
+function EditToolBridge({
+  tool,
+  projectId,
+}: {
+  tool: ToolInfo;
+  projectId: string;
+}) {
+  const startAiEdit = useWorkspaceContext((s) => s.startAiEdit);
+  const updateAiEditContent = useWorkspaceContext((s) => s.updateAiEditContent);
+  const completeAiEdit = useWorkspaceContext((s) => s.completeAiEdit);
+  const setActiveView = useWorkspaceContext((s) => s.setActiveView);
+  const utils = trpc.useUtils();
+
+  // AI SDK v6 tool part states: "input-streaming" → "input-available" → "output-available"
+  const isComplete = tool.state === "output-available";
+  const documentType = tool.toolName === "editPlan" ? ("plan" as const) : ("prd" as const);
+  const documentId = (tool.input?.planId ?? tool.input?.prdId) as string | undefined;
+  const streamingContent = tool.input?.content as string | undefined;
+  const didStart = useRef(false);
+  const didComplete = useRef(false);
+
+  // Start edit session + navigate to document (when documentId first becomes available)
+  useEffect(() => {
+    if (!documentId || didStart.current || isComplete) return;
+    didStart.current = true;
+    // Get pre-edit content from query cache for undo
+    const list =
+      documentType === "plan"
+        ? utils.plan.list.getData({ projectId })
+        : utils.prd.list.getData({ projectId });
+    const doc = list?.find((d: { id: string }) => d.id === documentId);
+    startAiEdit({
+      documentType,
+      documentId,
+      preEditContent: (doc as { content?: string } | undefined)?.content ?? "",
+    });
+    setActiveView(documentType === "plan" ? "plan" : "prd", {
+      type: documentType,
+      id: documentId,
+    });
+  }, [documentId, isComplete, documentType, projectId, startAiEdit, setActiveView, utils]);
+
+  // Update streaming content as it grows (during input-streaming and input-available)
+  useEffect(() => {
+    if (!isComplete && streamingContent != null && didStart.current) {
+      updateAiEditContent(streamingContent);
+    }
+  }, [isComplete, streamingContent, updateAiEditContent]);
+
+  // Complete: invalidate cache so editor picks up DB content
+  useEffect(() => {
+    if (!isComplete || didComplete.current) return;
+    didComplete.current = true;
+
+    // If the edit session was started, complete it
+    const aiEdit = useWorkspaceContext.getState().aiEdit;
+    if (aiEdit && !aiEdit.isComplete) {
+      completeAiEdit();
+    }
+
+    // Always invalidate cache to pick up the DB write from execute()
+    if (documentType === "plan") {
+      utils.plan.list.invalidate({ projectId });
+    } else {
+      utils.prd.list.invalidate({ projectId });
+    }
+  }, [isComplete, completeAiEdit, documentType, projectId, utils]);
+
+  return null;
+}
+
+function EditCompleteCard({
+  tool,
+  projectId,
+}: {
+  tool: ToolInfo;
+  projectId: string;
+}) {
+  const [undone, setUndone] = useState(false);
+  const aiEdit = useWorkspaceContext((s) => s.aiEdit);
+  const clearAiEdit = useWorkspaceContext((s) => s.clearAiEdit);
+  const utils = trpc.useUtils();
+  const planUpdate = trpc.plan.update.useMutation({
+    onSuccess: () => utils.plan.list.invalidate({ projectId }),
+  });
+  const prdUpdate = trpc.prd.update.useMutation({
+    onSuccess: () => utils.prd.list.invalidate({ projectId }),
+  });
+
+  const toolError = (tool.output as { status?: string; error?: string } | undefined)?.status === "error";
+  const errorMessage = (tool.output as { error?: string } | undefined)?.error;
+
+  const handleUndo = async () => {
+    if (!aiEdit || undone) return;
+    if (aiEdit.documentType === "plan") {
+      await planUpdate.mutateAsync({ id: aiEdit.documentId, content: aiEdit.preEditContent });
+    } else {
+      await prdUpdate.mutateAsync({ id: aiEdit.documentId, content: aiEdit.preEditContent });
+    }
+    setUndone(true);
+    clearAiEdit();
+    toast.success("Edit undone");
+  };
+
+  if (toolError) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 my-1">
+        <Sparkles className="h-4 w-4 text-destructive" />
+        <span className="text-xs font-medium flex-1 text-destructive">
+          Edit failed{errorMessage ? `: ${errorMessage}` : ""}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/40 px-3 py-2.5 my-1">
+      <Sparkles className="h-4 w-4 text-primary" />
+      <span className="text-xs font-medium flex-1">
+        {undone ? "Edit undone" : "Document updated"}
+      </span>
+      {!undone && (
+        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleUndo}>
+          Undo
+        </Button>
+      )}
+    </div>
+  );
 }
 
 function ToolProgressCard({
@@ -1034,13 +1192,18 @@ function PriorityScoresCard({ scores, projectId }: { scores: PriorityScore[]; pr
 
   const handleApply = async () => {
     if (!tree || applied) return;
-    // Normalize parentPaths — the AI may include rootFeature as the
-    // first element, but applyScoresToTree builds paths starting from
-    // tree.children (which excludes rootFeature).
+    // Normalize parentPaths — the AI may include the rootFeature (or the
+    // original artifact root name) as the first element, but
+    // applyScoresToTree builds paths starting from tree.children.
+    // After DB round-trip, rootFeature may become "Feature Tree" when
+    // there are multiple roots, so we also strip any leading element
+    // that isn't a direct child title.
+    const childTitles = new Set(tree.children.map((c) => c.title));
     const normalizedScores = scores.map((s) => ({
       ...s,
       parentPath:
-        s.parentPath.length > 0 && s.parentPath[0] === tree.rootFeature
+        s.parentPath.length > 0 &&
+        (s.parentPath[0] === tree.rootFeature || !childTitles.has(s.parentPath[0]))
           ? s.parentPath.slice(1)
           : s.parentPath,
     }));

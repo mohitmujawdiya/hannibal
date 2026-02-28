@@ -63,6 +63,7 @@ export function useProjectPlans(projectId: string) {
   return {
     data: query.data ?? [],
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     create,
     update,
     remove,
@@ -125,6 +126,7 @@ export function useProjectPrds(projectId: string) {
   return {
     data: query.data ?? [],
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     create,
     update,
     remove,
