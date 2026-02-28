@@ -42,11 +42,11 @@ export function FollowUpCard({
       </div>
 
       <div className="space-y-1.5">
-        {options.map((option) => {
+        {options.map((option, i) => {
           const isSelected = selectedAnswer === option.label;
           return (
             <button
-              key={option.label}
+              key={`${i}-${option.label}`}
               type="button"
               className={cn(
                 "w-full text-left rounded-md border px-3 py-2 text-sm transition-colors",
