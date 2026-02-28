@@ -24,6 +24,7 @@ type WorkspaceContextState = {
   highlightedText: string | null;
   sidebarOpen: boolean;
   aiPanelOpen: boolean;
+  focusAiInput: number;
   setActiveView: (view: ViewType) => void;
   setSelectedEntity: (entity: SelectedEntity) => void;
   setHighlightedText: (text: string | null) => void;
@@ -31,6 +32,7 @@ type WorkspaceContextState = {
   toggleAiPanel: () => void;
   setSidebarOpen: (open: boolean) => void;
   setAiPanelOpen: (open: boolean) => void;
+  requestAiFocus: () => void;
 };
 
 export const useWorkspaceContext = create<WorkspaceContextState>((set) => ({
@@ -39,6 +41,7 @@ export const useWorkspaceContext = create<WorkspaceContextState>((set) => ({
   highlightedText: null,
   sidebarOpen: true,
   aiPanelOpen: true,
+  focusAiInput: 0,
   setActiveView: (view) => set({ activeView: view, selectedEntity: null }),
   setSelectedEntity: (entity) => set({ selectedEntity: entity }),
   setHighlightedText: (text) => set({ highlightedText: text }),
@@ -46,4 +49,5 @@ export const useWorkspaceContext = create<WorkspaceContextState>((set) => ({
   toggleAiPanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setAiPanelOpen: (open) => set({ aiPanelOpen: open }),
+  requestAiFocus: () => set((s) => ({ aiPanelOpen: true, focusAiInput: s.focusAiInput + 1 })),
 }));

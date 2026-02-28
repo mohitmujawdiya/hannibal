@@ -7,6 +7,7 @@ import {
   Trash2,
   LayoutGrid,
   Loader2,
+  Plus,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -22,14 +23,18 @@ import { parseMarkdownSections } from "@/lib/parse-markdown-sections";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function PlanEditorView({ projectId }: { projectId: string }) {
-  const { data: plans, isLoading, update, remove } = useProjectPlans(projectId);
-  const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
-  const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
+  const { data: plans, isLoading, create, update, remove } = useProjectPlans(projectId);
+  const requestAiFocus = useWorkspaceContext((s) => s.requestAiFocus);
   const [viewMode, setViewMode] = useState<"card" | "markdown">("card");
 
   useEffect(() => {
     useWorkspaceContext.getState().setActiveView("plan");
   }, []);
+
+  const handleCreate = useCallback(async () => {
+    await create({ title: "Untitled Plan", content: "# Untitled Plan\n\n" });
+    setViewMode("markdown");
+  }, [create]);
 
   const updateContent = useCallback(
     async (input: { id: string; content: string }) => {
@@ -64,14 +69,18 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
             <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-1">No plans yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Ask Hannibal to create an implementation plan in the AI panel.
+              Create a blank plan or ask Hannibal to generate one.
             </p>
-            {!aiPanelOpen && (
-              <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
+            <div className="flex items-center justify-center gap-2">
+              <Button size="sm" onClick={requestAiFocus}>
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                Open AI Panel
+                Generate with AI
               </Button>
-            )}
+              <Button variant="outline" size="sm" onClick={handleCreate}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Start from Scratch
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -90,6 +99,10 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
           {savingState === "saved" && <span className="text-xs text-muted-foreground">Saved</span>}
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-8" onClick={handleCreate}>
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            New
+          </Button>
           <div className="flex items-center rounded-md border border-border">
             <Button
               variant={viewMode === "card" ? "secondary" : "ghost"}

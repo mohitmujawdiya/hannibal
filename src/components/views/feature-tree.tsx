@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectFeatureTree } from "@/hooks/use-project-data";
+import { trpc } from "@/lib/trpc";
 import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
 import { featureTreeToMarkdown } from "@/lib/artifact-to-markdown";
 import type { FeatureNode, FeatureTreeArtifact } from "@/lib/artifact-types";
@@ -155,8 +156,8 @@ function useUndoRedo<T>(maxHistory = 50) {
 
 function FeatureTreeContent({ projectId }: { projectId: string }) {
   const { tree: dbTree, isLoading, syncTree, removeAll } = useProjectFeatureTree(projectId);
-  const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
-  const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
+  const { data: project } = trpc.project.byId.useQuery({ id: projectId });
+  const requestAiFocus = useWorkspaceContext((s) => s.requestAiFocus);
   const [viewMode, setViewMode] = useState<"flow" | "list">("flow");
 
   // Local tree state for responsive editing
@@ -166,7 +167,11 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
 
   // Sync from DB on load and when data changes externally
   useEffect(() => {
-    if (dbTree && !hasPendingEdits.current) {
+    if (!dbTree) {
+      setLocalRoot(null);
+      setLocalChildren(null);
+      hasPendingEdits.current = false;
+    } else if (!hasPendingEdits.current) {
       setLocalRoot(dbTree.rootFeature);
       setLocalChildren(dbTree.children);
     }
@@ -206,12 +211,14 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
     [tree, debouncedSync],
   );
 
+  const rootLabel = project?.name ?? tree?.rootFeature ?? "Feature Tree";
+
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () =>
       tree
-        ? getLayoutedElements(tree.rootFeature, tree.children)
+        ? getLayoutedElements(rootLabel, tree.children)
         : { nodes: [], edges: [] },
-    [tree],
+    [tree, rootLabel],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -224,11 +231,11 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
   // Sync when artifact changes
   useEffect(() => {
     if (tree) {
-      const { nodes: n, edges: e } = getLayoutedElements(tree.rootFeature, tree.children);
+      const { nodes: n, edges: e } = getLayoutedElements(rootLabel, tree.children);
       setNodes(n);
       setEdges(e);
     }
-  }, [tree, setNodes, setEdges]);
+  }, [tree, rootLabel, setNodes, setEdges]);
 
   const getCopyText = () => tree ? featureTreeToMarkdown(tree) : "";
 
@@ -366,6 +373,13 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
     [nodes, handleUpdate],
   );
 
+  const handleCreateTree = useCallback(() => {
+    syncTree({
+      rootFeature: project?.name ?? "My Product",
+      children: [{ title: "New feature", description: "" }],
+    });
+  }, [syncTree, project?.name]);
+
   if (isLoading) {
     return (
       <div className="flex h-full flex-col">
@@ -390,14 +404,18 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
             <GitBranch className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-1">No feature trees yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Ask Hannibal to map out features for your product.
+              Start from scratch or ask Hannibal to map out features.
             </p>
-            {!aiPanelOpen && (
-              <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
+            <div className="flex items-center justify-center gap-2">
+              <Button size="sm" onClick={requestAiFocus}>
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                Open AI Panel
+                Generate with AI
               </Button>
-            )}
+              <Button variant="outline" size="sm" onClick={handleCreateTree}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Start from Scratch
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -525,11 +543,15 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
           <div className="overflow-auto p-6">
             <div className="max-w-3xl mx-auto">
               <div className="space-y-1">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-base font-semibold">{rootLabel}</span>
+                </div>
                 {tree.children.map((node, i) => (
                   <TreeNode
                     key={i}
                     node={node}
-                    depth={0}
+                    depth={1}
                     path={[i]}
                     onAddChild={handleAddChild}
                     onUpdate={handleUpdate}
@@ -539,6 +561,7 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
                 <button
                   onClick={() => handleAddChild("root")}
                   className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
+                  style={{ marginLeft: 40 }}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add top-level feature
@@ -567,7 +590,7 @@ function TreeNode({
   onUpdate?: (nodeId: string, u: { title?: string; description?: string }) => void;
   onDelete?: (nodeId: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(depth < 1);
+  const [expanded, setExpanded] = useState(true);
   const [isEditing, setIsEditing] = useState(node.title === "New feature");
   const [editTitle, setEditTitle] = useState(node.title);
   const [editDesc, setEditDesc] = useState(node.description ?? "");
@@ -673,11 +696,6 @@ function TreeNode({
                   </div>
                 )}
               </div>
-              {hasChildren && (
-                <span className="text-xs text-muted-foreground shrink-0">
-                  ({node.children!.length})
-                </span>
-              )}
               <div className="flex items-center gap-1 shrink-0">
                 {onAddChild && (
                   <button

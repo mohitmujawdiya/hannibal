@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Users,
   Target,
@@ -16,6 +16,7 @@ import {
   Check,
   X,
   Compass,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,10 +72,14 @@ function listToLines(items: string[]): string {
 }
 
 export function PersonaCardsView({ projectId }: { projectId: string }) {
-  const { data: personas, isLoading, update, remove } = useProjectPersonas(projectId);
-  const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
-  const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
+  const { data: personas, isLoading, create, update, remove } = useProjectPersonas(projectId);
+  const requestAiFocus = useWorkspaceContext((s) => s.requestAiFocus);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const handleCreate = useCallback(async () => {
+    const persona = await create({ name: "New Persona" });
+    setEditingId(persona.id);
+  }, [create]);
 
   useEffect(() => {
     useWorkspaceContext.getState().setActiveView("personas");
@@ -107,14 +112,18 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
             <Users className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-1">No personas yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Ask Hannibal to generate user personas for your product.
+              Add a persona manually or ask Hannibal to generate them.
             </p>
-            {!aiPanelOpen && (
-              <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
+            <div className="flex items-center justify-center gap-2">
+              <Button size="sm" onClick={requestAiFocus}>
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                Open AI Panel
+                Generate with AI
               </Button>
-            )}
+              <Button variant="outline" size="sm" onClick={handleCreate}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add Manually
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -134,6 +143,10 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
       <div className="border-b border-border px-6 h-12 flex items-center justify-between">
         <h2 className="text-base font-semibold">User Personas</h2>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-8" onClick={handleCreate}>
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Add Persona
+          </Button>
           <CopyButton getText={getCopyText} />
         </div>
       </div>

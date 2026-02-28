@@ -47,8 +47,9 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
     },
   });
   const updateMutation = trpc.project.update.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       utils.project.list.invalidate();
+      utils.project.byId.invalidate({ id: variables.id });
       setEditDialogOpen(false);
       setEditingProject(null);
       toast.success("Project renamed");

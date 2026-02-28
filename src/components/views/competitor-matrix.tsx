@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Swords,
   ExternalLink,
@@ -18,6 +18,7 @@ import {
   Crosshair,
   StickyNote,
   TrendingUp,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,10 +75,14 @@ function listToLines(items: string[]): string {
 }
 
 export function CompetitorMatrixView({ projectId }: { projectId: string }) {
-  const { data: competitors, isLoading, update, remove } = useProjectCompetitors(projectId);
-  const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
-  const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
+  const { data: competitors, isLoading, create, update, remove } = useProjectCompetitors(projectId);
+  const requestAiFocus = useWorkspaceContext((s) => s.requestAiFocus);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const handleCreate = useCallback(async () => {
+    const competitor = await create({ name: "New Competitor" });
+    setEditingId(competitor.id);
+  }, [create]);
 
   useEffect(() => {
     useWorkspaceContext.getState().setActiveView("competitors");
@@ -110,14 +115,18 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
             <Swords className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-1">No competitors analyzed</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Ask Hannibal to analyze competitors in your market.
+              Add a competitor manually or ask Hannibal to analyze your market.
             </p>
-            {!aiPanelOpen && (
-              <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
+            <div className="flex items-center justify-center gap-2">
+              <Button size="sm" onClick={requestAiFocus}>
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                Open AI Panel
+                Generate with AI
               </Button>
-            )}
+              <Button variant="outline" size="sm" onClick={handleCreate}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add Manually
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -137,6 +146,10 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
       <div className="border-b border-border px-6 h-12 flex items-center justify-between">
         <h2 className="text-base font-semibold">Competitive Analysis</h2>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-8" onClick={handleCreate}>
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Add Competitor
+          </Button>
           <CopyButton getText={getCopyText} />
         </div>
       </div>

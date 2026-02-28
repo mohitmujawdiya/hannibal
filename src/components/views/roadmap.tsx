@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Map, Sparkles } from "lucide-react";
+import { Map, Sparkles, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectRoadmap } from "@/hooks/use-project-data";
@@ -13,7 +13,7 @@ import { RoadmapToolbar } from "./roadmap/roadmap-toolbar";
 import { RoadmapTimeline } from "./roadmap/roadmap-timeline";
 import { RoadmapItemDialog } from "./roadmap/roadmap-item-dialog";
 import { ImportFeaturesDialog } from "./roadmap/import-features-dialog";
-import { computeInitialRange, rangeForScale, bestTimeScale } from "@/lib/roadmap-utils";
+import { computeInitialRange, rangeForScale, bestTimeScale, generateId } from "@/lib/roadmap-utils";
 import type { Range } from "dnd-timeline";
 import type {
   RoadmapItem,
@@ -23,8 +23,7 @@ import type {
 
 export function RoadmapView({ projectId }: { projectId: string }) {
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
-  const setAiPanelOpen = useWorkspaceContext((s) => s.setAiPanelOpen);
-  const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
+  const requestAiFocus = useWorkspaceContext((s) => s.requestAiFocus);
   const setSelectedEntity = useWorkspaceContext((s) => s.setSelectedEntity);
   const { roadmap: dbRoadmap, isLoading, syncRoadmap, remove } = useProjectRoadmap(projectId);
 
@@ -38,7 +37,10 @@ export function RoadmapView({ projectId }: { projectId: string }) {
   const hasPendingEdits = useRef(false);
 
   useEffect(() => {
-    if (dbRoadmap && !hasPendingEdits.current) {
+    if (!dbRoadmap) {
+      setLocalRoadmap(null);
+      hasPendingEdits.current = false;
+    } else if (!hasPendingEdits.current) {
       setLocalRoadmap(dbRoadmap);
     }
   }, [dbRoadmap]);
@@ -158,6 +160,15 @@ export function RoadmapView({ projectId }: { projectId: string }) {
     return roadmapToMarkdown(roadmap);
   }, [roadmap]);
 
+  const handleCreateRoadmap = useCallback(() => {
+    syncRoadmap({
+      title: "Roadmap",
+      timeScale: "MONTHLY",
+      lanes: [{ clientId: generateId(), name: "Features", color: "#6366f1", order: 0 }],
+      items: [],
+    });
+  }, [syncRoadmap]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -185,14 +196,17 @@ export function RoadmapView({ projectId }: { projectId: string }) {
             <h3 className="text-lg font-semibold mb-1">Roadmap</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Plan your timeline with swim lanes, milestones, and feature bars.
-              Ask the AI to generate a roadmap, or create one manually.
             </p>
-            {!aiPanelOpen && (
-              <Button variant="outline" size="sm" onClick={() => setAiPanelOpen(true)}>
+            <div className="flex items-center justify-center gap-2">
+              <Button size="sm" onClick={requestAiFocus}>
                 <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                Open AI Panel
+                Generate with AI
               </Button>
-            )}
+              <Button variant="outline" size="sm" onClick={handleCreateRoadmap}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Start from Scratch
+              </Button>
+            </div>
           </div>
         </div>
       </div>

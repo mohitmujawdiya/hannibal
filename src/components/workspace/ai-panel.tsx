@@ -63,12 +63,20 @@ export function AiPanel({ projectId }: AiPanelProps) {
   const selectedEntity = useWorkspaceContext((s) => s.selectedEntity);
   const highlightedText = useWorkspaceContext((s) => s.highlightedText);
   const toggleAiPanel = useWorkspaceContext((s) => s.toggleAiPanel);
+  const focusAiInput = useWorkspaceContext((s) => s.focusAiInput);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isAtBottom = useRef(true);
   const [input, setInput] = useState("");
   const [model, setModel] = useState("gpt-4o");
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  useEffect(() => {
+    if (focusAiInput > 0) {
+      // Small delay to ensure panel is rendered after opening
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  }, [focusAiInput]);
 
   const welcomeMessages = useMemo(() => [
     {
