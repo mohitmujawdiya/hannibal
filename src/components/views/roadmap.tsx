@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Map, Sparkles, Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectRoadmap } from "@/hooks/use-project-data";
@@ -46,6 +47,10 @@ export function RoadmapView({ projectId }: { projectId: string }) {
   }, [dbRoadmap]);
 
   const roadmap = localRoadmap ?? dbRoadmap;
+
+  // Ref to access latest roadmap state from stale closures (undo callbacks)
+  const roadmapRef = useRef(roadmap);
+  roadmapRef.current = roadmap;
 
   // Auto-pick the best time scale based on item spread
   const [range, setRange] = useState<Range>(() => {
@@ -142,7 +147,44 @@ export function RoadmapView({ projectId }: { projectId: string }) {
   const handleDeleteItem = useCallback(
     (id: string) => {
       if (!roadmap) return;
+      const deleted = roadmap.items.find((it) => it.id === id);
+      if (!deleted) return;
       handleUpdate({ items: roadmap.items.filter((it) => it.id !== id) });
+      toast("Item deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            const current = roadmapRef.current;
+            if (current) {
+              handleUpdate({ items: [...current.items, deleted] });
+            }
+          },
+        },
+        duration: 10000,
+      });
+    },
+    [roadmap, handleUpdate],
+  );
+
+  const handleDeleteLane = useCallback(
+    (laneId: string) => {
+      if (!roadmap) return;
+      const snapshot = { lanes: roadmap.lanes, items: roadmap.items };
+      const remaining = roadmap.lanes.filter((l) => l.id !== laneId);
+      const fallbackId = remaining[0]?.id;
+      const newItems = fallbackId
+        ? roadmap.items.map((it) => (it.laneId === laneId ? { ...it, laneId: fallbackId } : it))
+        : roadmap.items.filter((it) => it.laneId !== laneId);
+      handleUpdate({ lanes: remaining, items: newItems });
+      toast("Lane deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            handleUpdate({ lanes: snapshot.lanes, items: snapshot.items });
+          },
+        },
+        duration: 10000,
+      });
     },
     [roadmap, handleUpdate],
   );
@@ -232,6 +274,7 @@ export function RoadmapView({ projectId }: { projectId: string }) {
           onRangeChanged={setRange}
           onUpdate={handleUpdate}
           onItemClick={handleItemClick}
+          onDeleteLane={handleDeleteLane}
         />
       </div>
 

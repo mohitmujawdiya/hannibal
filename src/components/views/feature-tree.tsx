@@ -28,17 +28,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -478,41 +467,21 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
             </Button>
           </div>
           <CopyButton getText={getCopyText} />
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Delete
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete feature tree?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will delete the entire feature tree. This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={() => {
-                    cancelSync();
-                    hasPendingEdits.current = false;
-                    setLocalRoot(null);
-                    setLocalChildren(null);
-                    removeAll();
-                  }}
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-destructive hover:text-destructive"
+            onClick={() => {
+              cancelSync();
+              hasPendingEdits.current = false;
+              setLocalRoot(null);
+              setLocalChildren(null);
+              removeAll();
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1" />
+            Delete
+          </Button>
         </div>
       </div>
 

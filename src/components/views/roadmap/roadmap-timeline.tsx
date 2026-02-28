@@ -42,6 +42,7 @@ type RoadmapTimelineProps = {
   onRangeChanged: (fn: Range | ((prev: Range) => Range)) => void;
   onUpdate: (partial: Partial<RoadmapArtifact>) => void;
   onItemClick: (item: RoadmapItem) => void;
+  onDeleteLane: (laneId: string) => void;
 };
 
 export function RoadmapTimeline({
@@ -50,6 +51,7 @@ export function RoadmapTimeline({
   onRangeChanged,
   onUpdate,
   onItemClick,
+  onDeleteLane,
 }: RoadmapTimelineProps) {
   const { lanes, items } = artifact;
 
@@ -140,18 +142,6 @@ export function RoadmapTimeline({
     [lanes, onUpdate],
   );
 
-  const handleDeleteLane = useCallback(
-    (laneId: string) => {
-      const remaining = lanes.filter((l) => l.id !== laneId);
-      const fallbackId = remaining[0]?.id;
-      const newItems = fallbackId
-        ? items.map((it) => (it.laneId === laneId ? { ...it, laneId: fallbackId } : it))
-        : items.filter((it) => it.laneId !== laneId);
-      onUpdate({ lanes: remaining, items: newItems });
-    },
-    [lanes, items, onUpdate],
-  );
-
   return (
     <TimelineContext
       range={range}
@@ -172,7 +162,7 @@ export function RoadmapTimeline({
         onRangeChanged={onRangeChanged}
         onItemClick={onItemClick}
         onRenameLane={handleRenameLane}
-        onDeleteLane={handleDeleteLane}
+        onDeleteLane={onDeleteLane}
         onAddLane={handleAddLane}
       />
     </TimelineContext>
