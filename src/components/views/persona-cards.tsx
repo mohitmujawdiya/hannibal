@@ -172,20 +172,9 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
               return (
                 <Card key={persona.id} className="overflow-hidden gap-2">
                   <CardHeader className="pb-0">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base">{persona.name || parsed.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {parsed.demographics}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {parsed.techProficiency && (
-                          <Badge variant="outline" className="text-[10px] shrink-0 max-w-[180px]" title={parsed.techProficiency}>
-                            <Monitor className="h-3 w-3 mr-1 shrink-0" />
-                            <span className="truncate">{parsed.techProficiency}</span>
-                          </Badge>
-                        )}
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-base">{persona.name || parsed.name}</CardTitle>
+                      <div className="flex items-center gap-1 shrink-0">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -215,6 +204,19 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                         </Button>
                       </div>
                     </div>
+                    {parsed.demographics && (
+                      <p className="text-xs text-muted-foreground">
+                        {parsed.demographics}
+                      </p>
+                    )}
+                    {parsed.techProficiency && (
+                      <div>
+                        <Badge variant="outline" className="text-[10px]" title={parsed.techProficiency}>
+                          <Monitor className="h-3 w-3 mr-1 shrink-0" />
+                          <span className="truncate max-w-[250px]">{parsed.techProficiency}</span>
+                        </Badge>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {parsed.quote && (

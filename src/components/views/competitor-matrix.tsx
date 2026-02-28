@@ -175,32 +175,21 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
               return (
                 <Card key={comp.id} className="gap-2">
                   <CardHeader className="pb-0">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          {comp.name || parsed.name}
-                          {parsed.url && sanitizeUrl(parsed.url) && (
-                            <a
-                              href={sanitizeUrl(parsed.url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground hover:text-foreground"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {parsed.positioning}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {parsed.pricing && (
-                          <Badge variant="outline" className="text-[10px] shrink-0 max-w-[180px]" title={parsed.pricing}>
-                            <DollarSign className="h-3 w-3 mr-0.5 shrink-0" />
-                            <span className="truncate">{parsed.pricing}</span>
-                          </Badge>
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        {comp.name || parsed.name}
+                        {parsed.url && sanitizeUrl(parsed.url) && (
+                          <a
+                            href={sanitizeUrl(parsed.url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
                         )}
+                      </CardTitle>
+                      <div className="flex items-center gap-1 shrink-0">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -230,6 +219,19 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                         </Button>
                       </div>
                     </div>
+                    {parsed.positioning && (
+                      <p className="text-sm text-muted-foreground">
+                        {parsed.positioning}
+                      </p>
+                    )}
+                    {parsed.pricing && (
+                      <div>
+                        <Badge variant="outline" className="text-[10px]" title={parsed.pricing}>
+                          <DollarSign className="h-3 w-3 mr-0.5 shrink-0" />
+                          <span className="truncate max-w-[250px]">{parsed.pricing}</span>
+                        </Badge>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
