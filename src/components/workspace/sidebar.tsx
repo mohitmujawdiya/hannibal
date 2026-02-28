@@ -33,13 +33,13 @@ type SidebarProps = {
 const viewItems: { id: ViewType; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "plan", label: "Plan", icon: FileText },
+  { id: "research", label: "Research", icon: Search },
+  { id: "competitors", label: "Competitors", icon: Swords },
+  { id: "personas", label: "Personas", icon: Users },
   { id: "prd", label: "PRD", icon: ClipboardList },
   { id: "features", label: "Features", icon: GitBranch },
-  { id: "roadmap", label: "Roadmap", icon: Map },
   { id: "priorities", label: "Priorities", icon: BarChart3 },
-  { id: "personas", label: "Personas", icon: Users },
-  { id: "competitors", label: "Competitors", icon: Swords },
-  { id: "research", label: "Research", icon: Search },
+  { id: "roadmap", label: "Roadmap", icon: Map },
 ];
 
 export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Trash2,
   BookOpen,
+  MessageCircleQuestion,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +41,7 @@ import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectFeatureTree, useProjectRoadmap } from "@/hooks/use-project-data";
 import { useConversation } from "@/hooks/use-conversation";
 import { ArtifactCard } from "@/components/ai/artifact-card";
+import { FollowUpCard } from "@/components/ai/follow-up-card";
 import { localChatStore } from "@/lib/chat-persistence";
 import { sanitizeUrl } from "@/lib/sanitize-url";
 import type { Artifact, FeatureNode, RoadmapArtifact, RoadmapItem } from "@/lib/artifact-types";
@@ -103,7 +105,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
     [],
   );
 
-  const { messages, setMessages, sendMessage, status, stop } = useChat({
+  const { messages, setMessages, sendMessage, status, stop, addToolOutput } = useChat({
     transport,
   });
 
@@ -187,6 +189,17 @@ export function AiPanel({ projectId }: AiPanelProps) {
     setShowScrollBtn(false);
     sendMessage({ text });
   }, [input, sendMessage]);
+
+  const handleFollowUpAnswer = useCallback(
+    async (toolCallId: string, answer: string) => {
+      await addToolOutput({
+        tool: "askFollowUp",
+        toolCallId,
+        output: { answer },
+      });
+    },
+    [addToolOutput],
+  );
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -285,7 +298,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
                       }
                       const tool = extractToolInfo(part);
                       if (tool) {
-                        return renderToolPart(tool, i, projectId);
+                        return renderToolPart(tool, i, projectId, handleFollowUpAnswer);
                       }
                       return null;
                     })}
@@ -395,6 +408,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
 
 type ToolInfo = {
   toolName: string;
+  toolCallId: string;
   state: string;
   input: Record<string, unknown> | undefined;
   output: Record<string, unknown> | undefined;
@@ -421,6 +435,7 @@ function extractToolInfo(part: unknown): ToolInfo | null {
   if (type.startsWith("tool-")) {
     return {
       toolName: type.slice(5),
+      toolCallId: (p.toolCallId as string) ?? "",
       state: (p.state as string) ?? "call",
       input: p.input as Record<string, unknown> | undefined,
       output: p.output as Record<string, unknown> | undefined,
@@ -431,6 +446,7 @@ function extractToolInfo(part: unknown): ToolInfo | null {
   if (type === "dynamic-tool") {
     return {
       toolName: (p.toolName as string) ?? "",
+      toolCallId: (p.toolCallId as string) ?? "",
       state: (p.state as string) ?? "call",
       input: p.input as Record<string, unknown> | undefined,
       output: p.output as Record<string, unknown> | undefined,
@@ -440,8 +456,54 @@ function extractToolInfo(part: unknown): ToolInfo | null {
   return null;
 }
 
-function renderToolPart(tool: ToolInfo, key: number, projectId: string) {
+function renderToolPart(
+  tool: ToolInfo,
+  key: number,
+  projectId: string,
+  onFollowUpAnswer?: (toolCallId: string, answer: string) => void,
+) {
   const isComplete = tool.state === "output-available";
+
+  if (tool.toolName === "askFollowUp") {
+    const question = (tool.input?.question as string) ?? "";
+    const options =
+      (tool.input?.options as Array<{ label: string; description?: string }>) ?? [];
+
+    if (isComplete) {
+      const answer = (tool.output?.answer as string) ?? "";
+      return (
+        <FollowUpCard
+          key={key}
+          question={question}
+          options={options}
+          disabled
+          selectedAnswer={answer}
+          onSelect={() => {}}
+        />
+      );
+    }
+
+    // Input still streaming — show progress
+    if (tool.state !== "call" || !question || options.length === 0) {
+      return (
+        <ToolProgressCard
+          key={key}
+          icon={MessageCircleQuestion}
+          label="Thinking"
+        />
+      );
+    }
+
+    // Interactive state — user hasn't answered yet
+    return (
+      <FollowUpCard
+        key={key}
+        question={question}
+        options={options}
+        onSelect={(answer) => onFollowUpAnswer?.(tool.toolCallId, answer)}
+      />
+    );
+  }
 
   if (tool.toolName === "webSearch") {
     const query = (tool.input?.query as string) ?? "";
