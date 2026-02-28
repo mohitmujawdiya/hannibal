@@ -145,7 +145,7 @@ const featureTreeTool = tool({
 
 const competitorTool = tool({
   description:
-    "Generate a competitor analysis as a market analyst focused on strategic positioning. Focus on where the competitor is heading and where they're structurally unable to go — not surface-level feature checklists.",
+    "Generate a competitor analysis for ONE single competitor as a market analyst focused on strategic positioning. Focus on where the competitor is heading and where they're structurally unable to go — not surface-level feature checklists. IMPORTANT: Generate exactly ONE competitor per call. If the user asks about multiple competitors, call this tool separately for each one.",
   inputSchema: jsonSchema<{ title: string; content: string }>({
     type: "object",
     properties: {

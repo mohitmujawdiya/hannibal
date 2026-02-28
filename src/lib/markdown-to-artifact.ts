@@ -32,7 +32,7 @@ function extractBoldField(md: string, key: string): string {
 /** Extract bullet items from a bold-labeled list: **Label:**\n- item1\n- item2 */
 function extractBoldList(md: string, label: string): string[] {
   const pattern = new RegExp(
-    `\\*\\*${escapeRegex(label)}:\\*\\*\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*[A-Z]|\\n##\\s)`,
+    `\\*\\*${escapeRegex(label)}:\\*\\*\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*[A-Z]|\\n#{2,3}\\s)`,
     "m"
   );
   const match = md.match(pattern);
@@ -82,7 +82,7 @@ function escapeRegex(str: string): string {
 /** Extract raw text (not bullet items) from a bold-labeled block: **Label:**\nsome text\nmulti-line */
 function extractBoldText(md: string, label: string): string {
   const pattern = new RegExp(
-    `\\*\\*${escapeRegex(label)}:\\*\\*\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*[A-Z]|\\n##\\s)`,
+    `\\*\\*${escapeRegex(label)}:\\*\\*\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*[A-Z]|\\n#{2,3}\\s)`,
     "m"
   );
   const match = md.match(pattern);
