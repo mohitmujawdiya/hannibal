@@ -145,28 +145,30 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
     );
   }
 
-  // Detail mode — editing a specific plan
-  if (effectivePlanId) {
-    const activePlan = plans.find((p) => p.id === effectivePlanId);
-    if (!activePlan) {
-      if (isFetching || aiEditPlanId) {
-        // Query is still refetching or AI edit is in progress — wait for it
-        return (
-          <div className="flex h-full flex-col">
-            <div className="border-b border-border px-6 h-12 flex items-center">
-              <h2 className="text-base font-semibold">Plans</h2>
-            </div>
-            <div className="flex-1 p-6 space-y-4">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          </div>
-        );
-      }
-      // Query settled and plan not found — it was deleted
+  // Reset selectedPlanId if the referenced plan no longer exists (e.g. deleted)
+  useEffect(() => {
+    if (selectedPlanId && !isFetching && !isLoading && !plans.find((p) => p.id === selectedPlanId)) {
       setSelectedPlanId(null);
-      return null;
     }
+  }, [selectedPlanId, plans, isFetching, isLoading]);
+
+  // Detail mode — editing a specific plan
+  const activePlan = effectivePlanId ? plans.find((p) => p.id === effectivePlanId) : null;
+  if (effectivePlanId && !activePlan && (isFetching || aiEditPlanId)) {
+    // Query is still refetching or AI edit is in progress — wait for it
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">Plans</h2>
+        </div>
+        <div className="flex-1 p-6 space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
+  if (effectivePlanId && activePlan) {
     const content = activePlan.content;
     const isAiEditing =
       aiEdit?.documentType === "plan" &&

@@ -144,28 +144,30 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
     );
   }
 
-  // Detail mode — editing a specific PRD
-  if (effectivePrdId) {
-    const activePrd = prds.find((p) => p.id === effectivePrdId);
-    if (!activePrd) {
-      if (isFetching || aiEditPrdId) {
-        // Query is still refetching or AI edit is in progress — wait for it
-        return (
-          <div className="flex h-full flex-col">
-            <div className="border-b border-border px-6 h-12 flex items-center">
-              <h2 className="text-base font-semibold">PRDs</h2>
-            </div>
-            <div className="flex-1 p-6 space-y-4">
-              <Skeleton className="h-32 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          </div>
-        );
-      }
-      // Query settled and PRD not found — it was deleted
+  // Reset selectedPrdId if the referenced PRD no longer exists (e.g. deleted)
+  useEffect(() => {
+    if (selectedPrdId && !isFetching && !isLoading && !prds.find((p) => p.id === selectedPrdId)) {
       setSelectedPrdId(null);
-      return null;
     }
+  }, [selectedPrdId, prds, isFetching, isLoading]);
+
+  // Detail mode — editing a specific PRD
+  const activePrd = effectivePrdId ? prds.find((p) => p.id === effectivePrdId) : null;
+  if (effectivePrdId && !activePrd && (isFetching || aiEditPrdId)) {
+    // Query is still refetching or AI edit is in progress — wait for it
+    return (
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-6 h-12 flex items-center">
+          <h2 className="text-base font-semibold">PRDs</h2>
+        </div>
+        <div className="flex-1 p-6 space-y-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    );
+  }
+  if (effectivePrdId && activePrd) {
     const content = activePrd.content;
     const isAiEditing =
       aiEdit?.documentType === "prd" &&
