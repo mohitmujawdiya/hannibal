@@ -38,16 +38,16 @@ const artifactMeta: Record<
 
 function useSaveArtifact(projectId: string) {
   const utils = trpc.useUtils();
-  const planCreate = trpc.plan.create.useMutation({
+  const planPush = trpc.plan.pushFromAI.useMutation({
     onSuccess: () => utils.plan.list.invalidate({ projectId }),
   });
-  const prdCreate = trpc.prd.create.useMutation({
+  const prdPush = trpc.prd.pushFromAI.useMutation({
     onSuccess: () => utils.prd.list.invalidate({ projectId }),
   });
-  const personaCreate = trpc.persona.create.useMutation({
+  const personaPush = trpc.persona.pushFromAI.useMutation({
     onSuccess: () => utils.persona.list.invalidate({ projectId }),
   });
-  const competitorCreate = trpc.competitor.create.useMutation({
+  const competitorPush = trpc.competitor.pushFromAI.useMutation({
     onSuccess: () => utils.competitor.list.invalidate({ projectId }),
   });
   const featureSync = trpc.feature.syncTree.useMutation({
@@ -61,17 +61,17 @@ function useSaveArtifact(projectId: string) {
     async (artifact: Artifact) => {
       switch (artifact.type) {
         case "plan":
-          return planCreate.mutateAsync({ projectId, title: artifact.title, content: artifact.content });
+          return planPush.mutateAsync({ projectId, title: artifact.title, content: artifact.content });
         case "prd":
-          return prdCreate.mutateAsync({ projectId, title: artifact.title, content: artifact.content });
+          return prdPush.mutateAsync({ projectId, title: artifact.title, content: artifact.content });
         case "persona":
-          return personaCreate.mutateAsync({
+          return personaPush.mutateAsync({
             projectId,
             name: artifact.title || artifact.name || "Persona",
             content: artifact.content,
           });
         case "competitor":
-          return competitorCreate.mutateAsync({
+          return competitorPush.mutateAsync({
             projectId,
             name: artifact.title || artifact.name || "Competitor",
             content: artifact.content,
@@ -88,14 +88,14 @@ function useSaveArtifact(projectId: string) {
         }
       }
     },
-    [projectId, planCreate, prdCreate, personaCreate, competitorCreate, featureSync, roadmapSync],
+    [projectId, planPush, prdPush, personaPush, competitorPush, featureSync, roadmapSync],
   );
 
   const isPending =
-    planCreate.isPending ||
-    prdCreate.isPending ||
-    personaCreate.isPending ||
-    competitorCreate.isPending ||
+    planPush.isPending ||
+    prdPush.isPending ||
+    personaPush.isPending ||
+    competitorPush.isPending ||
     featureSync.isPending ||
     roadmapSync.isPending;
 

@@ -181,9 +181,9 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                       </div>
                       <div className="flex items-center gap-1">
                         {parsed.techProficiency && (
-                          <Badge variant="outline" className="text-[10px] shrink-0">
-                            <Monitor className="h-3 w-3 mr-1" />
-                            {parsed.techProficiency}
+                          <Badge variant="outline" className="text-[10px] shrink-0 max-w-[180px]" title={parsed.techProficiency}>
+                            <Monitor className="h-3 w-3 mr-1 shrink-0" />
+                            <span className="truncate">{parsed.techProficiency}</span>
                           </Badge>
                         )}
                         <Button
@@ -264,7 +264,7 @@ export function PersonaCardsView({ projectId }: { projectId: string }) {
                           <Compass className="h-3 w-3" />
                           Decision-Making Context
                         </div>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-3">{parsed.decisionMakingContext}</p>
+                        <DecisionMakingFields text={parsed.decisionMakingContext} />
                       </div>
                     )}
 
@@ -568,6 +568,46 @@ function PersonaList({
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Parse "**Label:** value" lines from decision-making context and render as labeled fields. */
+function DecisionMakingFields({ text }: { text: string }) {
+  const lines = text.split("\n").filter((l) => l.trim());
+  const fields: { label: string; value: string }[] = [];
+  let fallbackLines: string[] = [];
+
+  for (const line of lines) {
+    const cleaned = line.replace(/^\s*-\s*/, "");
+    const match = cleaned.match(/^\*\*(.+?):\*\*\s*(.*)/);
+    if (match) {
+      fields.push({ label: match[1], value: match[2] });
+    } else {
+      fallbackLines.push(cleaned);
+    }
+  }
+
+  // If no bold-labeled fields found, fall back to plain text
+  if (fields.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground whitespace-pre-wrap pl-3">{text}</p>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5 pl-3">
+      {fields.map((f, i) => (
+        <div key={i} className="text-sm">
+          <span className="font-medium text-violet-400/80">{f.label}:</span>{" "}
+          <span className="text-muted-foreground">{f.value}</span>
+        </div>
+      ))}
+      {fallbackLines.length > 0 && (
+        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+          {fallbackLines.join("\n")}
+        </p>
+      )}
     </div>
   );
 }

@@ -94,13 +94,13 @@ export function serializeFullArtifact(
     }
     case "roadmap": {
       const laneSummary = artifact.lanes
-        .map((l) => l.name)
+        .map((l) => `${l.name} (id: ${l.id})`)
         .join(", ");
       const itemLines = artifact.items
         .slice(0, 20)
         .map((it) => {
           const lane = artifact.lanes.find((l) => l.id === it.laneId);
-          return `- [${it.type}] ${it.title} (${it.startDate} → ${it.endDate}) [${it.status}] in ${lane?.name ?? "?"}`;
+          return `- [${it.type}] ${it.title} (id: ${it.id}) (${it.startDate} → ${it.endDate}) [${it.status}] in ${lane?.name ?? "?"} (laneId: ${it.laneId})`;
         })
         .join("\n");
       const truncNote =
@@ -282,7 +282,7 @@ export function summarizeArtifact(artifact: StoredArtifact): string {
       return `[Feature Tree] "${artifact.rootFeature}" (id: ${artifact.id}) — ${total} features (${leaves} leaves), ${scored.length} RICE-scored${topByRice}\n  Categories: ${categories}`;
     }
     case "roadmap": {
-      const laneNames = artifact.lanes.map((l) => l.name).join(", ");
+      const laneNames = artifact.lanes.map((l) => `${l.name} (id: ${l.id})`).join(", ");
       const statusCounts: Record<string, number> = {};
       let milestoneCount = 0;
       for (const item of artifact.items) {

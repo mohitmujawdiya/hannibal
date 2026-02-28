@@ -107,6 +107,25 @@ export function AiPanel({ projectId }: AiPanelProps) {
 
   const { messages, setMessages, sendMessage, status, stop, addToolOutput } = useChat({
     transport,
+    sendAutomaticallyWhen: ({ messages: msgs }) => {
+      const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+      if (!lastAssistant) return false;
+      // Only auto-send when askFollowUp is the LAST tool part (user just answered).
+      // After the continuation, generatePlan etc. become the last tool part → returns false.
+      const toolParts = lastAssistant.parts.filter(
+        (p: { type?: string }) => p.type?.startsWith("tool-") || p.type === "dynamic-tool",
+      );
+      if (toolParts.length === 0) return false;
+      const last = toolParts[toolParts.length - 1] as {
+        type?: string;
+        toolName?: string;
+        state?: string;
+      };
+      const isFollowUp =
+        last.type === "tool-askFollowUp" ||
+        (last.type === "dynamic-tool" && last.toolName === "askFollowUp");
+      return isFollowUp && last.state === "output-available";
+    },
   });
 
   const { initialize, syncMessages: syncToDb, clearConversation } = useConversation(projectId);
@@ -483,24 +502,24 @@ function renderToolPart(
       );
     }
 
-    // Input still streaming — show progress
-    if (tool.state !== "call" || !question || options.length === 0) {
+    // Interactive state — input is fully available (question + options populated)
+    if (question && options.length > 0) {
       return (
-        <ToolProgressCard
+        <FollowUpCard
           key={key}
-          icon={MessageCircleQuestion}
-          label="Thinking"
+          question={question}
+          options={options}
+          onSelect={(answer) => onFollowUpAnswer?.(tool.toolCallId, answer)}
         />
       );
     }
 
-    // Interactive state — user hasn't answered yet
+    // Input still streaming
     return (
-      <FollowUpCard
+      <ToolProgressCard
         key={key}
-        question={question}
-        options={options}
-        onSelect={(answer) => onFollowUpAnswer?.(tool.toolCallId, answer)}
+        icon={MessageCircleQuestion}
+        label="Thinking"
       />
     );
   }

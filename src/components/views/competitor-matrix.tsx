@@ -196,9 +196,9 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                       </div>
                       <div className="flex items-center gap-1">
                         {parsed.pricing && (
-                          <Badge variant="outline" className="text-[10px] shrink-0">
-                            <DollarSign className="h-3 w-3 mr-0.5" />
-                            {parsed.pricing}
+                          <Badge variant="outline" className="text-[10px] shrink-0 max-w-[180px]" title={parsed.pricing}>
+                            <DollarSign className="h-3 w-3 mr-0.5 shrink-0" />
+                            <span className="truncate">{parsed.pricing}</span>
                           </Badge>
                         )}
                         <Button

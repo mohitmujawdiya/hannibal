@@ -51,6 +51,36 @@ export const planRouter = router({
       });
     }),
 
+  pushFromAI: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string().cuid(),
+        title: z.string().min(1).max(500),
+        content: z.string().max(100_000).default(""),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
+      const existing = await ctx.db.plan.findFirst({
+        where: { projectId: input.projectId, deletedAt: null },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true },
+      });
+      if (existing) {
+        return ctx.db.plan.update({
+          where: { id: existing.id },
+          data: { title: input.title, content: input.content },
+        });
+      }
+      return ctx.db.plan.create({
+        data: {
+          title: input.title,
+          content: input.content || `# ${input.title}\n\n`,
+          projectId: input.projectId,
+        },
+      });
+    }),
+
   update: protectedProcedure
     .input(
       z.object({

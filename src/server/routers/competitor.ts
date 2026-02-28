@@ -72,6 +72,31 @@ export const competitorRouter = router({
       });
     }),
 
+  pushFromAI: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string().cuid(),
+        name: z.string().min(1).max(200),
+        content: z.string().max(50_000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
+      const existing = await ctx.db.competitor.findFirst({
+        where: { projectId: input.projectId, name: input.name, deletedAt: null },
+        select: { id: true },
+      });
+      if (existing) {
+        return ctx.db.competitor.update({
+          where: { id: existing.id },
+          data: { content: input.content },
+        });
+      }
+      return ctx.db.competitor.create({
+        data: { name: input.name, content: input.content, projectId: input.projectId },
+      });
+    }),
+
   update: protectedProcedure
     .input(
       z.object({
