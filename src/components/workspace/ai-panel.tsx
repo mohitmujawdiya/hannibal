@@ -750,7 +750,10 @@ function EditToolBridge({
   // AI SDK v6 tool part states: "input-streaming" → "input-available" → "output-available"
   const isComplete = tool.state === "output-available";
   const documentType = tool.toolName === "editPlan" ? ("plan" as const) : ("prd" as const);
-  const documentId = (tool.input?.planId ?? tool.input?.prdId) as string | undefined;
+  // During input-streaming, planId may be partially parsed (e.g. "cm" instead of full CUID).
+  // Only use it once it looks like a complete CUID to avoid capturing a truncated ID.
+  const rawDocumentId = (tool.input?.planId ?? tool.input?.prdId) as string | undefined;
+  const documentId = rawDocumentId && /^c[^\s-]{8,}$/i.test(rawDocumentId) ? rawDocumentId : undefined;
   const streamingContent = tool.input?.content as string | undefined;
   const didStart = useRef(false);
   const didComplete = useRef(false);

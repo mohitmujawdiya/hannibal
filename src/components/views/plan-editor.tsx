@@ -65,7 +65,13 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   const selectedEntity = useWorkspaceContext((s) => s.selectedEntity);
   const setSelectedEntity = useWorkspaceContext((s) => s.setSelectedEntity);
   const aiEdit = useWorkspaceContext((s) => s.aiEdit);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(() => {
+    const entity = useWorkspaceContext.getState().selectedEntity;
+    if (entity?.type === "plan") return entity.id;
+    const edit = useWorkspaceContext.getState().aiEdit;
+    if (edit?.documentType === "plan") return edit.documentId;
+    return null;
+  });
   const [viewMode, setViewMode] = useState<"card" | "markdown">("card");
 
   useEffect(() => {
