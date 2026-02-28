@@ -750,10 +750,10 @@ function EditToolBridge({
   // AI SDK v6 tool part states: "input-streaming" → "input-available" → "output-available"
   const isComplete = tool.state === "output-available";
   const documentType = tool.toolName === "editPlan" ? ("plan" as const) : ("prd" as const);
-  // During input-streaming, planId may be partially parsed (e.g. "cm" instead of full CUID).
-  // Only use it once it looks like a complete CUID to avoid capturing a truncated ID.
+  // During input-streaming, planId may be partially parsed. Prisma CUIDs are 25 chars.
+  // Only use it once it looks complete to avoid capturing a truncated streaming ID.
   const rawDocumentId = (tool.input?.planId ?? tool.input?.prdId) as string | undefined;
-  const documentId = rawDocumentId && /^c[^\s-]{8,}$/i.test(rawDocumentId) ? rawDocumentId : undefined;
+  const documentId = rawDocumentId && rawDocumentId.length >= 24 && /^c[^\s-]{8,}$/i.test(rawDocumentId) ? rawDocumentId : undefined;
   const streamingContent = tool.input?.content as string | undefined;
   const didStart = useRef(false);
   const didComplete = useRef(false);
@@ -831,10 +831,15 @@ function EditCompleteCard({
 
   const handleUndo = async () => {
     if (!aiEdit || undone) return;
+    // Use documentId from tool output (guaranteed correct from execute) over aiEdit
+    // which may have captured a truncated streaming ID
+    const output = tool.output as { documentId?: string } | undefined;
+    const docId = output?.documentId ?? aiEdit.documentId;
+    if (!docId || !aiEdit.preEditContent) return;
     if (aiEdit.documentType === "plan") {
-      await planUpdate.mutateAsync({ id: aiEdit.documentId, content: aiEdit.preEditContent });
+      await planUpdate.mutateAsync({ id: docId, content: aiEdit.preEditContent });
     } else {
-      await prdUpdate.mutateAsync({ id: aiEdit.documentId, content: aiEdit.preEditContent });
+      await prdUpdate.mutateAsync({ id: docId, content: aiEdit.preEditContent });
     }
     setUndone(true);
     clearAiEdit();

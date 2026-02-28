@@ -73,19 +73,24 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
   });
   const [viewMode, setViewMode] = useState<"card" | "markdown">("card");
 
+  // Derive effective PRD ID: state may lag behind store updates, so also
+  // check aiEdit and selectedEntity directly to avoid flashing the list view.
+  const aiEditPrdId = aiEdit?.documentType === "prd" && !aiEdit.isComplete ? aiEdit.documentId : null;
+  const entityPrdId = selectedEntity?.type === "prd" ? selectedEntity.id : null;
+  const effectivePrdId = selectedPrdId ?? aiEditPrdId ?? entityPrdId;
+
   useEffect(() => {
     // Only set activeView — don't clear selectedEntity (it may have been set by artifact push)
     useWorkspaceContext.setState({ activeView: "prd" });
   }, []);
 
-  // Handle navigation from AI push (selectedEntity has prd ID)
+  // Handle navigation from AI push or AI edit
   useEffect(() => {
     if (selectedEntity?.type === "prd" && selectedEntity.id) {
       setSelectedPrdId(selectedEntity.id);
     }
   }, [selectedEntity]);
 
-  // Auto-navigate to the PRD being edited by AI
   useEffect(() => {
     if (aiEdit?.documentType === "prd" && aiEdit.documentId && !aiEdit.isComplete) {
       setSelectedPrdId(aiEdit.documentId);
@@ -97,9 +102,8 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (selectedPrdId) {
       setSelectedEntity({ type: "prd", id: selectedPrdId });
-    } else {
-      setSelectedEntity(null);
     }
+    // Only clear on explicit user navigation (back button), not on mount/effect races
   }, [selectedPrdId, setSelectedEntity]);
 
   const handleCreate = useCallback(async () => {
@@ -141,11 +145,11 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
   }
 
   // Detail mode — editing a specific PRD
-  if (selectedPrdId) {
-    const activePrd = prds.find((p) => p.id === selectedPrdId);
+  if (effectivePrdId) {
+    const activePrd = prds.find((p) => p.id === effectivePrdId);
     if (!activePrd) {
-      if (isFetching) {
-        // Query is still refetching (e.g. after AI push) — wait for it
+      if (isFetching || aiEditPrdId) {
+        // Query is still refetching or AI edit is in progress — wait for it
         return (
           <div className="flex h-full flex-col">
             <div className="border-b border-border px-6 h-12 flex items-center">
@@ -165,7 +169,7 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
     const content = activePrd.content;
     const isAiEditing =
       aiEdit?.documentType === "prd" &&
-      aiEdit.documentId === selectedPrdId &&
+      aiEdit.documentId === effectivePrdId &&
       !aiEdit.isComplete;
     const displayContent = isAiEditing ? (aiEdit.streamingContent || content) : content;
     const effectiveViewMode = isAiEditing ? "card" : viewMode;

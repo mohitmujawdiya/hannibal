@@ -74,19 +74,24 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   });
   const [viewMode, setViewMode] = useState<"card" | "markdown">("card");
 
+  // Derive effective plan ID: state may lag behind store updates, so also
+  // check aiEdit and selectedEntity directly to avoid flashing the list view.
+  const aiEditPlanId = aiEdit?.documentType === "plan" && !aiEdit.isComplete ? aiEdit.documentId : null;
+  const entityPlanId = selectedEntity?.type === "plan" ? selectedEntity.id : null;
+  const effectivePlanId = selectedPlanId ?? aiEditPlanId ?? entityPlanId;
+
   useEffect(() => {
     // Only set activeView — don't clear selectedEntity (it may have been set by artifact push)
     useWorkspaceContext.setState({ activeView: "plan" });
   }, []);
 
-  // Handle navigation from AI push (selectedEntity has plan ID)
+  // Handle navigation from AI push or AI edit
   useEffect(() => {
     if (selectedEntity?.type === "plan" && selectedEntity.id) {
       setSelectedPlanId(selectedEntity.id);
     }
   }, [selectedEntity]);
 
-  // Auto-navigate to the plan being edited by AI
   useEffect(() => {
     if (aiEdit?.documentType === "plan" && aiEdit.documentId && !aiEdit.isComplete) {
       setSelectedPlanId(aiEdit.documentId);
@@ -98,9 +103,8 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   useEffect(() => {
     if (selectedPlanId) {
       setSelectedEntity({ type: "plan", id: selectedPlanId });
-    } else {
-      setSelectedEntity(null);
     }
+    // Only clear on explicit user navigation (back button), not on mount/effect races
   }, [selectedPlanId, setSelectedEntity]);
 
   const handleCreate = useCallback(async () => {
@@ -142,11 +146,11 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   }
 
   // Detail mode — editing a specific plan
-  if (selectedPlanId) {
-    const activePlan = plans.find((p) => p.id === selectedPlanId);
+  if (effectivePlanId) {
+    const activePlan = plans.find((p) => p.id === effectivePlanId);
     if (!activePlan) {
-      if (isFetching) {
-        // Query is still refetching (e.g. after AI push) — wait for it
+      if (isFetching || aiEditPlanId) {
+        // Query is still refetching or AI edit is in progress — wait for it
         return (
           <div className="flex h-full flex-col">
             <div className="border-b border-border px-6 h-12 flex items-center">
@@ -166,7 +170,7 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
     const content = activePlan.content;
     const isAiEditing =
       aiEdit?.documentType === "plan" &&
-      aiEdit.documentId === selectedPlanId &&
+      aiEdit.documentId === effectivePlanId &&
       !aiEdit.isComplete;
     const displayContent = isAiEditing ? (aiEdit.streamingContent || content) : content;
     const effectiveViewMode = isAiEditing ? "card" : viewMode;
