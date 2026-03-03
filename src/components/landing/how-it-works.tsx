@@ -5,9 +5,9 @@ import { motion } from "motion/react";
 const steps = [
   {
     number: "01",
-    title: "Describe your product",
+    title: "Describe your idea",
     description:
-      "Tell the AI about your product, market, and goals in natural language.",
+      "Tell the AI about your idea, market, and goals — even if it's just a rough concept.",
   },
   {
     number: "02",
@@ -17,9 +17,9 @@ const steps = [
   },
   {
     number: "03",
-    title: "Refine & ship",
+    title: "Iterate & launch",
     description:
-      "Edit, reorganize, and iterate in the workspace. Push to your roadmap when ready.",
+      "Edit, reorganize, and refine in the workspace. Push to your roadmap when ready.",
   },
 ] as const;
 

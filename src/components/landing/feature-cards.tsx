@@ -9,13 +9,13 @@ const features = [
     icon: FileText,
     title: "AI Plans & PRDs",
     description:
-      "Generate comprehensive product plans and specs from a single prompt.",
+      "Turn a rough idea into a structured plan and detailed spec in seconds.",
   },
   {
     icon: GitBranch,
     title: "Feature Trees",
     description:
-      "Visualize your product as an interactive feature hierarchy with AI suggestions.",
+      "Break down your vision into an interactive feature hierarchy. AI fills in what you miss.",
   },
   {
     icon: Map,
@@ -27,7 +27,7 @@ const features = [
     icon: Users,
     title: "Personas",
     description:
-      "AI-generated user personas grounded in your product context and market.",
+      "Know your users before you build. AI creates personas grounded in your market.",
   },
   {
     icon: Swords,
@@ -50,8 +50,8 @@ export function FeatureCards() {
           transition={{ duration: 0.6, ease }}
           className="mb-12 text-center text-2xl font-semibold sm:text-3xl"
         >
-          Everything a PM needs.{" "}
-          <span className="text-muted-foreground">AI does the rest.</span>
+          Everything you need from idea to launch.{" "}
+          <span className="text-muted-foreground">AI does the heavy lifting.</span>
         </motion.h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, i) => (

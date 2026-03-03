@@ -89,7 +89,7 @@ export function HeroSection() {
           transition={{ duration: 0.6, delay: 0.5, ease }}
           className="mx-auto mt-4 max-w-lg text-lg text-muted-foreground sm:text-xl"
         >
-          The AI workspace where product strategy writes itself.
+          Go from rough idea to full product plan in minutes — whether you&apos;re a founder brainstorming or a PM shipping.
         </motion.p>
 
         {/* Signup form */}
