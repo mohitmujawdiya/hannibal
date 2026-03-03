@@ -76,9 +76,9 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
 
   // Derive effective PRD ID: state may lag behind store updates, so also
   // check aiEdit and selectedEntity directly to avoid flashing the list view.
-  // Include completed (but not yet cleared) AI edits so the view doesn't
-  // flash back to the list between completeAiEdit() and cache refetch.
-  const aiEditPrdId = aiEdit?.documentType === "prd" ? aiEdit.documentId : null;
+  // Only use in-progress edits (not completed) — completed edits have already
+  // set selectedPrdId, so they don't need to force the detail view.
+  const aiEditPrdId = aiEdit?.documentType === "prd" && !aiEdit.isComplete ? aiEdit.documentId : null;
   const entityPrdId = selectedEntity?.type === "prd" ? selectedEntity.id : null;
   const effectivePrdId = selectedPrdId ?? aiEditPrdId ?? entityPrdId;
 
@@ -134,17 +134,6 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
     [update],
   );
   const { debouncedFn: debouncedUpdate, savingState } = useDebouncedMutation(updateContent);
-
-  // Clear completed AI edit once the cache has loaded the updated document,
-  // or if the document ID doesn't match any PRD (stale/incorrect ID).
-  useEffect(() => {
-    if (aiEdit?.documentType === "prd" && aiEdit.isComplete) {
-      const found = prds.find((p) => p.id === aiEdit.documentId);
-      if (found || !isFetching) {
-        useWorkspaceContext.getState().clearAiEdit();
-      }
-    }
-  }, [aiEdit?.documentType, aiEdit?.isComplete, aiEdit?.documentId, prds, isFetching]);
 
   // Reset selectedPrdId if the referenced PRD no longer exists (e.g. deleted)
   useEffect(() => {

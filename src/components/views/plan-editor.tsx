@@ -77,9 +77,9 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
 
   // Derive effective plan ID: state may lag behind store updates, so also
   // check aiEdit and selectedEntity directly to avoid flashing the list view.
-  // Include completed (but not yet cleared) AI edits so the view doesn't
-  // flash back to the list between completeAiEdit() and cache refetch.
-  const aiEditPlanId = aiEdit?.documentType === "plan" ? aiEdit.documentId : null;
+  // Only use in-progress edits (not completed) — completed edits have already
+  // set selectedPlanId, so they don't need to force the detail view.
+  const aiEditPlanId = aiEdit?.documentType === "plan" && !aiEdit.isComplete ? aiEdit.documentId : null;
   const entityPlanId = selectedEntity?.type === "plan" ? selectedEntity.id : null;
   const effectivePlanId = selectedPlanId ?? aiEditPlanId ?? entityPlanId;
 
@@ -135,17 +135,6 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
     [update],
   );
   const { debouncedFn: debouncedUpdate, savingState } = useDebouncedMutation(updateContent);
-
-  // Clear completed AI edit once the cache has loaded the updated document,
-  // or if the document ID doesn't match any plan (stale/incorrect ID).
-  useEffect(() => {
-    if (aiEdit?.documentType === "plan" && aiEdit.isComplete) {
-      const found = plans.find((p) => p.id === aiEdit.documentId);
-      if (found || !isFetching) {
-        useWorkspaceContext.getState().clearAiEdit();
-      }
-    }
-  }, [aiEdit?.documentType, aiEdit?.isComplete, aiEdit?.documentId, plans, isFetching]);
 
   // Reset selectedPlanId if the referenced plan no longer exists (e.g. deleted)
   useEffect(() => {
