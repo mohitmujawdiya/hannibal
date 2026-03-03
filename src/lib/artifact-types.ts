@@ -18,6 +18,8 @@ export type PlanArtifact = {
   content?: string;
   /** @deprecated Migrated to content. Present only in legacy persisted artifacts. */
   sections?: PlanSections;
+  /** DB id of the existing plan this artifact targets. Used by pushFromAI for stable matching after title renames. */
+  existingId?: string;
 };
 
 /** Legacy sections format — used only for migration from persisted data */
@@ -38,6 +40,8 @@ export type PrdArtifact = {
   content?: string;
   /** @deprecated Migrated to content. Present only in legacy persisted artifacts. */
   sections?: PrdSections;
+  /** DB id of the existing PRD this artifact targets. Used by pushFromAI for stable matching after title renames. */
+  existingId?: string;
 };
 
 export type PersonaArtifact = {

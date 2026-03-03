@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
@@ -28,6 +28,12 @@ export function MarkdownDoc({
 }: MarkdownDocProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResize = useCallback((el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, []);
 
   useEffect(() => {
     if (readOnly && isEditing) setIsEditing(false);
@@ -36,6 +42,13 @@ export function MarkdownDoc({
   useEffect(() => {
     if (!isEditing) setLocalValue(value);
   }, [value, isEditing]);
+
+  // Auto-resize on entering edit mode or when value changes while editing
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      autoResize(textareaRef.current);
+    }
+  }, [isEditing, localValue, autoResize]);
 
   const handleBlur = useCallback(() => {
     onChange(localValue);
@@ -65,15 +78,19 @@ export function MarkdownDoc({
           </button>
         </div>
         <textarea
+          ref={textareaRef}
           value={localValue}
-          onChange={(e) => setLocalValue(e.target.value)}
+          onChange={(e) => {
+            setLocalValue(e.target.value);
+            autoResize(e.target);
+          }}
           onBlur={handleBlur}
           placeholder={placeholder}
           className={cn(
             "w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm",
             "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
             minHeight,
-            "resize-y",
+            "resize-none overflow-hidden",
           )}
           spellCheck={false}
         />

@@ -22,7 +22,7 @@ export function TimelineHeader({ timeScale }: TimelineHeaderProps) {
       {/* Corner cell — matches sidebar width */}
       <div
         className="sticky left-0 z-30 shrink-0 border-b border-r border-border/50 bg-muted/80"
-        style={{ width: sidebarWidth || 220 }}
+        style={{ width: sidebarWidth || 150 }}
       />
 
       {/* Column headers — pixel-positioned */}

@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
+import { EditableTitle } from "@/components/ui/editable-title";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectPlans } from "@/hooks/use-project-data";
 import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
@@ -85,10 +86,12 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
     useWorkspaceContext.setState({ activeView: "plan" });
   }, []);
 
-  // Handle navigation from AI push or AI edit
+  // Handle navigation from AI push, AI edit, or sidebar re-click
   useEffect(() => {
     if (selectedEntity?.type === "plan" && selectedEntity.id) {
       setSelectedPlanId(selectedEntity.id);
+    } else if (!selectedEntity) {
+      setSelectedPlanId(null);
     }
   }, [selectedEntity]);
 
@@ -131,6 +134,13 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   );
   const { debouncedFn: debouncedUpdate, savingState } = useDebouncedMutation(updateContent);
 
+  // Reset selectedPlanId if the referenced plan no longer exists (e.g. deleted)
+  useEffect(() => {
+    if (selectedPlanId && !isFetching && !isLoading && !plans.find((p) => p.id === selectedPlanId)) {
+      setSelectedPlanId(null);
+    }
+  }, [selectedPlanId, plans, isFetching, isLoading]);
+
   if (isLoading) {
     return (
       <div className="flex h-full flex-col">
@@ -144,13 +154,6 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
       </div>
     );
   }
-
-  // Reset selectedPlanId if the referenced plan no longer exists (e.g. deleted)
-  useEffect(() => {
-    if (selectedPlanId && !isFetching && !isLoading && !plans.find((p) => p.id === selectedPlanId)) {
-      setSelectedPlanId(null);
-    }
-  }, [selectedPlanId, plans, isFetching, isLoading]);
 
   // Detail mode — editing a specific plan
   const activePlan = effectivePlanId ? plans.find((p) => p.id === effectivePlanId) : null;
@@ -180,16 +183,20 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
     return (
       <div className="flex h-full flex-col">
         <div className="border-b border-border px-6 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2"
-              onClick={() => setSelectedPlanId(null)}
+              className="h-8 px-2 shrink-0"
+              onClick={() => { setSelectedPlanId(null); setSelectedEntity(null); }}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h2 className="text-base font-semibold truncate max-w-[300px]">{activePlan.title}</h2>
+            <EditableTitle
+              value={activePlan.title}
+              onSave={(title) => update({ id: activePlan.id, title })}
+              disabled={isAiEditing}
+            />
             {isAiEditing && (
               <div className="flex items-center gap-1.5 text-xs text-primary">
                 <Pencil className="h-3 w-3 animate-pulse" />
@@ -299,14 +306,16 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
             return (
               <Card
                 key={plan.id}
-                className="cursor-pointer transition-colors hover:border-foreground/20 hover:bg-accent/50"
+                className="cursor-pointer transition-colors hover:border-foreground/20 hover:bg-accent/50 gap-2"
                 onClick={() => setSelectedPlanId(plan.id)}
               >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-sm font-medium leading-tight line-clamp-2">
-                      {plan.title}
-                    </CardTitle>
+                <CardHeader className="pb-0">
+                  <div className="flex items-start justify-between gap-2 min-w-0">
+                    <EditableTitle
+                      value={plan.title}
+                      size="sm"
+                      onSave={(title) => update({ id: plan.id, title })}
+                    />
                     <Badge
                       variant="secondary"
                       className={cn("text-[10px] shrink-0", statusCfg.className)}

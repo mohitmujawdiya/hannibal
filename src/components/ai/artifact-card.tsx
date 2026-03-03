@@ -60,9 +60,9 @@ function useSaveArtifact(projectId: string) {
     async (artifact: Artifact) => {
       switch (artifact.type) {
         case "plan":
-          return planPush.mutateAsync({ projectId, title: artifact.title, content: artifact.content });
+          return planPush.mutateAsync({ projectId, title: artifact.title, content: artifact.content, id: artifact.existingId });
         case "prd":
-          return prdPush.mutateAsync({ projectId, title: artifact.title, content: artifact.content });
+          return prdPush.mutateAsync({ projectId, title: artifact.title, content: artifact.content, id: artifact.existingId });
         case "persona":
           return personaPush.mutateAsync({
             projectId,

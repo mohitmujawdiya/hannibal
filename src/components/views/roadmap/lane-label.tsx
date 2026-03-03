@@ -28,10 +28,10 @@ export function LaneLabel({ lane, itemCount, onRename, onDelete }: LaneLabelProp
   };
 
   return (
-    <div className="w-[220px] shrink-0 border-r border-b border-border/50 bg-muted/80 flex items-center group overflow-hidden sticky left-0 z-10">
+    <div className="w-[150px] shrink-0 border-r border-b border-border/50 bg-muted/80 flex items-center group relative sticky left-0 z-10">
       {/* Colored left indent */}
       <div className="self-stretch w-1.5 shrink-0" style={{ backgroundColor: lane.color }} />
-      <div className="flex items-center justify-center gap-2.5 px-3 py-3 flex-1 min-w-0">
+      <div className="flex items-center justify-center px-2 py-3 flex-1 min-w-0">
         {editing ? (
           <input
             ref={inputRef}
@@ -45,25 +45,26 @@ export function LaneLabel({ lane, itemCount, onRename, onDelete }: LaneLabelProp
                 setEditing(false);
               }
             }}
-            className="flex-1 min-w-0 bg-transparent text-base font-semibold outline-none border-b border-primary"
+            className="flex-1 min-w-0 bg-transparent text-sm font-semibold outline-none border border-border rounded-md px-1.5 py-0.5"
           />
         ) : (
           <button
             type="button"
-            className="flex-1 min-w-0 text-center text-base font-semibold truncate hover:text-primary transition-colors"
+            className="flex-1 min-w-0 text-center text-sm font-semibold text-wrap break-words rounded-md hover:ring-1 hover:ring-border transition-colors px-1.5 py-0.5"
             onClick={() => setEditing(true)}
           >
             {lane.name}
           </button>
         )}
-        <button
-          type="button"
-          onClick={onDelete}
-          className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
-        >
-          <Trash2 className="h-3 w-3" />
-        </button>
       </div>
+      {/* Delete button — top-right corner overlay */}
+      <button
+        type="button"
+        onClick={onDelete}
+        className="absolute top-2 right-1 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

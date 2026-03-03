@@ -4,9 +4,10 @@ import type { RoadmapTimeScale } from "@/lib/artifact-types";
 const planTool = tool({
   description:
     "Generate a plan as a senior product strategist who's taken products from 0-to-1. Infer the plan type from the title and context, then adapt section structure accordingly. Every section should be specific enough that a team could estimate and begin work from it. No vague placeholders — if you lack specifics, call out what needs validation.",
-  inputSchema: jsonSchema<{ title: string; content: string }>({
+  inputSchema: jsonSchema<{ title: string; content: string; existingId?: string }>({
     type: "object",
     properties: {
+      existingId: { type: "string", description: "If updating an existing plan, pass its id from the artifact context (e.g. the value shown as '(id: clx...)' in the Current Artifact State). Omit when creating a brand-new plan." },
       title: { type: "string", description: "Plan title" },
       content: {
         type: "string",
@@ -21,6 +22,7 @@ const planTool = tool({
       type: "plan" as const,
       title: params.title,
       content: params.content,
+      ...(params.existingId ? { existingId: params.existingId } : {}),
     },
     status: "generated",
   }),
@@ -29,9 +31,10 @@ const planTool = tool({
 const prdTool = tool({
   description:
     "Generate a PRD or spec as a staff technical product leader who writes specs engineers ship from. Infer the spec type from the title and context, then adapt section structure accordingly. Every requirement should be specific enough that two engineers would independently build the same thing.",
-  inputSchema: jsonSchema<{ title: string; content: string }>({
+  inputSchema: jsonSchema<{ title: string; content: string; existingId?: string }>({
     type: "object",
     properties: {
+      existingId: { type: "string", description: "If updating an existing PRD, pass its id from the artifact context (e.g. the value shown as '(id: clx...)' in the Current Artifact State). Omit when creating a brand-new PRD." },
       title: { type: "string", description: "PRD title" },
       content: {
         type: "string",
@@ -46,6 +49,7 @@ const prdTool = tool({
       type: "prd" as const,
       title: params.title,
       content: params.content,
+      ...(params.existingId ? { existingId: params.existingId } : {}),
     },
     status: "generated",
   }),

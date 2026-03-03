@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PanelRightOpen } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable-panels";
+import { Button } from "@/components/ui/button";
 import { Sidebar } from "./sidebar";
 import { MainContent } from "./main-content";
 import { AiPanel } from "./ai-panel";
@@ -75,7 +77,7 @@ export function WorkspaceShell({ projectId, projectName }: WorkspaceShellProps) 
           <MainContent projectId={projectId} />
         </ResizablePanel>
 
-        {aiPanelOpen && (
+        {aiPanelOpen ? (
           <>
             <ResizableHandle />
             <ResizablePanel
@@ -87,6 +89,18 @@ export function WorkspaceShell({ projectId, projectName }: WorkspaceShellProps) 
               <AiPanel projectId={projectId} />
             </ResizablePanel>
           </>
+        ) : (
+          <div className="flex items-center h-12 px-3 border-b border-border shrink-0 self-start">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={toggleAiPanel}
+              title="Open AI panel (⌘L)"
+            >
+              <PanelRightOpen className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         )}
       </ResizablePanelGroup>
     </div>

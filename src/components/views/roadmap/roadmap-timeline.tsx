@@ -302,7 +302,7 @@ function TimelineInner({
           <div style={{ display: "inline-flex", width: "100%" }}>
             <div
               className="sticky left-0 z-10 shrink-0 border-r border-border/50 bg-muted/80"
-              style={{ width: sidebarWidth || 220 }}
+              style={{ width: sidebarWidth || 150 }}
             >
               <Button
                 variant="ghost"

@@ -59,20 +59,39 @@ export const prdRouter = router({
         projectId: z.string().cuid(),
         title: z.string().min(1).max(500),
         content: z.string().max(100_000).default(""),
+        id: z.string().cuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await assertProjectOwnership(ctx.db, input.projectId, ctx.userId);
-      const existing = await ctx.db.pRD.findFirst({
+
+      // 1. Match by ID (stable across title renames)
+      if (input.id) {
+        const byId = await ctx.db.pRD.findFirst({
+          where: { id: input.id, projectId: input.projectId, deletedAt: null },
+          select: { id: true },
+        });
+        if (byId) {
+          return ctx.db.pRD.update({
+            where: { id: byId.id },
+            data: { title: input.title, content: input.content },
+          });
+        }
+      }
+
+      // 2. Fall back to title match
+      const byTitle = await ctx.db.pRD.findFirst({
         where: { projectId: input.projectId, title: input.title, deletedAt: null },
         select: { id: true },
       });
-      if (existing) {
+      if (byTitle) {
         return ctx.db.pRD.update({
-          where: { id: existing.id },
+          where: { id: byTitle.id },
           data: { title: input.title, content: input.content },
         });
       }
+
+      // 3. Create new
       return ctx.db.pRD.create({
         data: {
           title: input.title,
