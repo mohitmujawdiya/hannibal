@@ -41,15 +41,19 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
   const createMutation = trpc.project.create.useMutation({
     onSuccess: (project) => {
       utils.project.list.invalidate();
-      router.push(`/${project.id}`);
+      router.push(`/${project.slug}`);
       setDialogOpen(false);
       setNewProjectName("");
     },
   });
   const updateMutation = trpc.project.update.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       utils.project.list.invalidate();
       utils.project.byId.invalidate({ id: variables.id });
+      // Navigate to new slug if the current project was renamed
+      if (variables.id === projectId) {
+        router.replace(`/${data.slug}`, { scroll: false });
+      }
       setEditDialogOpen(false);
       setEditingProject(null);
       toast.success("Project renamed");
@@ -90,7 +94,7 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
         if (project.id === projectId) {
           const remaining = projects?.filter((p) => p.id !== project.id);
           if (remaining && remaining.length > 0) {
-            router.push(`/${remaining[0].id}`);
+            router.push(`/${remaining[0].slug}`);
           } else {
             router.push("/");
           }
@@ -151,7 +155,7 @@ export function ProjectSwitcher({ projectId, collapsed }: ProjectSwitcherProps) 
               className="group flex items-center gap-2 pr-1"
               onSelect={() => {
                 if (project.id !== projectId) {
-                  router.push(`/${project.id}`);
+                  router.push(`/${project.slug}`);
                 }
               }}
             >

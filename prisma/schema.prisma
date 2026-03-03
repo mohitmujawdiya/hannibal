@@ -72,6 +72,7 @@ enum DependencyType {
 model Project {
   id          String        @id @default(cuid())
   name        String
+  slug        String        @unique @map("slug")
   description String?
   status      ProjectStatus @default(ACTIVE)
   userId      String        @map("user_id")

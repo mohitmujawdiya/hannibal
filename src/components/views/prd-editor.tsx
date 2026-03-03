@@ -76,7 +76,9 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
 
   // Derive effective PRD ID: state may lag behind store updates, so also
   // check aiEdit and selectedEntity directly to avoid flashing the list view.
-  const aiEditPrdId = aiEdit?.documentType === "prd" && !aiEdit.isComplete ? aiEdit.documentId : null;
+  // Include completed (but not yet cleared) AI edits so the view doesn't
+  // flash back to the list between completeAiEdit() and cache refetch.
+  const aiEditPrdId = aiEdit?.documentType === "prd" ? aiEdit.documentId : null;
   const entityPrdId = selectedEntity?.type === "prd" ? selectedEntity.id : null;
   const effectivePrdId = selectedPrdId ?? aiEditPrdId ?? entityPrdId;
 
@@ -156,7 +158,8 @@ export function PrdEditorView({ projectId }: { projectId: string }) {
 
   // Detail mode — editing a specific PRD
   const activePrd = effectivePrdId ? prds.find((p) => p.id === effectivePrdId) : null;
-  if (effectivePrdId && !activePrd && (isFetching || aiEditPrdId)) {
+  const isAiEditingThisPrd = aiEdit?.documentType === "prd" && aiEdit.documentId === effectivePrdId;
+  if (effectivePrdId && !activePrd && (isFetching || isAiEditingThisPrd)) {
     // AI is streaming content but PRD isn't in query cache yet — show live preview
     if (aiEdit?.documentType === "prd" && aiEdit.streamingContent && !aiEdit.isComplete) {
       return (

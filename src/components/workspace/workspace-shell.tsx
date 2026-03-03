@@ -13,18 +13,22 @@ import { MainContent } from "./main-content";
 import { AiPanel } from "./ai-panel";
 import { WorkspaceSkeleton } from "./workspace-skeleton";
 import { useWorkspaceContext } from "@/stores/workspace-context";
+import { useViewUrlSync } from "@/hooks/use-view-url-sync";
 
 type WorkspaceShellProps = {
   projectId: string;
   projectName?: string;
+  projectSlug: string;
 };
 
-export function WorkspaceShell({ projectId, projectName }: WorkspaceShellProps) {
+export function WorkspaceShell({ projectId, projectName, projectSlug }: WorkspaceShellProps) {
   const [mounted, setMounted] = useState(false);
   const sidebarOpen = useWorkspaceContext((s) => s.sidebarOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
   const toggleSidebar = useWorkspaceContext((s) => s.toggleSidebar);
   const toggleAiPanel = useWorkspaceContext((s) => s.toggleAiPanel);
+
+  useViewUrlSync(projectSlug);
 
   useEffect(() => {
     setMounted(true);

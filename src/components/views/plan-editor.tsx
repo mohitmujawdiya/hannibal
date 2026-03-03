@@ -77,7 +77,9 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
 
   // Derive effective plan ID: state may lag behind store updates, so also
   // check aiEdit and selectedEntity directly to avoid flashing the list view.
-  const aiEditPlanId = aiEdit?.documentType === "plan" && !aiEdit.isComplete ? aiEdit.documentId : null;
+  // Include completed (but not yet cleared) AI edits so the view doesn't
+  // flash back to the list between completeAiEdit() and cache refetch.
+  const aiEditPlanId = aiEdit?.documentType === "plan" ? aiEdit.documentId : null;
   const entityPlanId = selectedEntity?.type === "plan" ? selectedEntity.id : null;
   const effectivePlanId = selectedPlanId ?? aiEditPlanId ?? entityPlanId;
 
@@ -157,7 +159,8 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
 
   // Detail mode — editing a specific plan
   const activePlan = effectivePlanId ? plans.find((p) => p.id === effectivePlanId) : null;
-  if (effectivePlanId && !activePlan && (isFetching || aiEditPlanId)) {
+  const isAiEditingThisPlan = aiEdit?.documentType === "plan" && aiEdit.documentId === effectivePlanId;
+  if (effectivePlanId && !activePlan && (isFetching || isAiEditingThisPlan)) {
     // AI is streaming content but plan isn't in query cache yet — show live preview
     if (aiEdit?.documentType === "plan" && aiEdit.streamingContent && !aiEdit.isComplete) {
       return (
