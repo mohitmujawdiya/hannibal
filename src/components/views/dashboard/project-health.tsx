@@ -81,7 +81,7 @@ export function ProjectHealth({
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                   done
-                    ? "border-green-500/30 text-green-500 hover:bg-green-500/10"
+                    ? "border-blue-600/30 text-blue-400 hover:bg-blue-600/10"
                     : "border-border text-muted-foreground hover:bg-muted",
                 )}
               >

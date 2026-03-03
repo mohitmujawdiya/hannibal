@@ -43,7 +43,7 @@ export function RoadmapPulse({
           <div className="space-y-3">
             {overdueItems.length > 0 && (
               <div className="space-y-1">
-                <p className="text-sm font-medium text-red-400">Overdue</p>
+                <p className="text-xs font-medium uppercase tracking-wider text-red-400/80">Overdue</p>
                 <ul className="space-y-0.5">
                   {overdueItems.map((item) => (
                     <li key={item.title + item.endDate}>
@@ -51,9 +51,9 @@ export function RoadmapPulse({
                         onClick={() => onNavigate("roadmap")}
                         className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm text-left hover:bg-muted transition-colors"
                       >
-                        <span className="h-2 w-2 rounded-full bg-red-400 shrink-0" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-400/80 shrink-0" />
                         <span className="flex-1 truncate">{item.title}</span>
-                        <span className="text-xs text-red-400 shrink-0">
+                        <span className="text-xs text-red-400/80 shrink-0">
                           {formatDate(item.endDate)}
                         </span>
                       </button>
@@ -65,7 +65,7 @@ export function RoadmapPulse({
 
             {upcomingItems.length > 0 && (
               <div className="space-y-1">
-                <p className="text-sm font-medium text-yellow-400">
+                <p className="text-xs font-medium uppercase tracking-wider text-yellow-400">
                   Next 2 Weeks
                 </p>
                 <ul className="space-y-0.5">
@@ -75,7 +75,7 @@ export function RoadmapPulse({
                         onClick={() => onNavigate("roadmap")}
                         className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm text-left hover:bg-muted transition-colors"
                       >
-                        <span className="h-2 w-2 rounded-full bg-yellow-400 shrink-0" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 shrink-0" />
                         <span className="flex-1 truncate">{item.title}</span>
                         <span className="text-xs text-muted-foreground shrink-0">
                           {formatDate(item.endDate)}
