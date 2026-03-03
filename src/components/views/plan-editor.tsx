@@ -158,7 +158,24 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   // Detail mode — editing a specific plan
   const activePlan = effectivePlanId ? plans.find((p) => p.id === effectivePlanId) : null;
   if (effectivePlanId && !activePlan && (isFetching || aiEditPlanId)) {
-    // Query is still refetching or AI edit is in progress — wait for it
+    // AI is streaming content but plan isn't in query cache yet — show live preview
+    if (aiEdit?.documentType === "plan" && aiEdit.streamingContent && !aiEdit.isComplete) {
+      return (
+        <div className="flex h-full flex-col">
+          <div className="border-b border-border px-6 h-12 flex items-center gap-2">
+            <h2 className="text-base font-semibold">Plans</h2>
+            <div className="flex items-center gap-1.5 text-xs text-primary">
+              <Pencil className="h-3 w-3 animate-pulse" />
+              <span>AI is editing...</span>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto p-6">
+            <SectionCardLayout content={aiEdit.streamingContent} />
+          </div>
+        </div>
+      );
+    }
+    // Query is still refetching — wait for it
     return (
       <div className="flex h-full flex-col">
         <div className="border-b border-border px-6 h-12 flex items-center">

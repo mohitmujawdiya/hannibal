@@ -759,8 +759,10 @@ function EditToolBridge({
   const didComplete = useRef(false);
 
   // Start edit session + navigate to document (when documentId first becomes available)
+  // NOTE: Do NOT guard on isComplete — if the tool resolves before React processes
+  // the streaming state, we still need to start the edit session for navigation.
   useEffect(() => {
-    if (!documentId || didStart.current || isComplete) return;
+    if (!documentId || didStart.current) return;
     didStart.current = true;
     // Get pre-edit content from query cache for undo
     const list =
@@ -777,7 +779,7 @@ function EditToolBridge({
       type: documentType,
       id: documentId,
     });
-  }, [documentId, isComplete, documentType, projectId, startAiEdit, setActiveView, utils]);
+  }, [documentId, documentType, projectId, startAiEdit, setActiveView, utils]);
 
   // Update streaming content as it grows (during input-streaming and input-available)
   useEffect(() => {
