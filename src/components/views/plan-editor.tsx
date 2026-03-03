@@ -136,6 +136,17 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   );
   const { debouncedFn: debouncedUpdate, savingState } = useDebouncedMutation(updateContent);
 
+  // Clear completed AI edit once the cache has loaded the updated document,
+  // or if the document ID doesn't match any plan (stale/incorrect ID).
+  useEffect(() => {
+    if (aiEdit?.documentType === "plan" && aiEdit.isComplete) {
+      const found = plans.find((p) => p.id === aiEdit.documentId);
+      if (found || !isFetching) {
+        useWorkspaceContext.getState().clearAiEdit();
+      }
+    }
+  }, [aiEdit?.documentType, aiEdit?.isComplete, aiEdit?.documentId, plans, isFetching]);
+
   // Reset selectedPlanId if the referenced plan no longer exists (e.g. deleted)
   useEffect(() => {
     if (selectedPlanId && !isFetching && !isLoading && !plans.find((p) => p.id === selectedPlanId)) {
@@ -161,16 +172,18 @@ export function PlanEditorView({ projectId }: { projectId: string }) {
   const activePlan = effectivePlanId ? plans.find((p) => p.id === effectivePlanId) : null;
   const isAiEditingThisPlan = aiEdit?.documentType === "plan" && aiEdit.documentId === effectivePlanId;
   if (effectivePlanId && !activePlan && (isFetching || isAiEditingThisPlan)) {
-    // AI is streaming content but plan isn't in query cache yet — show live preview
-    if (aiEdit?.documentType === "plan" && aiEdit.streamingContent && !aiEdit.isComplete) {
+    // AI edit in progress or just completed but cache hasn't refetched yet — show live preview
+    if (aiEdit?.documentType === "plan" && aiEdit.streamingContent) {
       return (
         <div className="flex h-full flex-col">
           <div className="border-b border-border px-6 h-12 flex items-center gap-2">
             <h2 className="text-base font-semibold">Plans</h2>
-            <div className="flex items-center gap-1.5 text-xs text-primary">
-              <Pencil className="h-3 w-3 animate-pulse" />
-              <span>AI is editing...</span>
-            </div>
+            {!aiEdit.isComplete && (
+              <div className="flex items-center gap-1.5 text-xs text-primary">
+                <Pencil className="h-3 w-3 animate-pulse" />
+                <span>AI is editing...</span>
+              </div>
+            )}
           </div>
           <div className="flex-1 overflow-auto p-6">
             <SectionCardLayout content={aiEdit.streamingContent} />

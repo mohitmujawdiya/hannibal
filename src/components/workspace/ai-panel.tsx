@@ -757,11 +757,15 @@ function EditToolBridge({
   const streamingContent = tool.input?.content as string | undefined;
   const didStart = useRef(false);
   const didComplete = useRef(false);
+  // If the tool was already complete on first render, this is a restored message
+  // from conversation history — skip all side effects to avoid re-triggering edits.
+  const isRestored = useRef(isComplete);
 
   // Start edit session + navigate to document (when documentId first becomes available)
   // NOTE: Do NOT guard on isComplete — if the tool resolves before React processes
   // the streaming state, we still need to start the edit session for navigation.
   useEffect(() => {
+    if (isRestored.current) return;
     if (!documentId || didStart.current) return;
     didStart.current = true;
     // Get pre-edit content from query cache for undo
@@ -783,6 +787,7 @@ function EditToolBridge({
 
   // Update streaming content as it grows (during input-streaming and input-available)
   useEffect(() => {
+    if (isRestored.current) return;
     if (!isComplete && streamingContent != null && didStart.current) {
       updateAiEditContent(streamingContent);
     }
@@ -790,6 +795,7 @@ function EditToolBridge({
 
   // Complete: invalidate cache so editor picks up DB content
   useEffect(() => {
+    if (isRestored.current) return;
     if (!isComplete || didComplete.current) return;
     didComplete.current = true;
 
@@ -828,20 +834,31 @@ function EditCompleteCard({
     onSuccess: () => utils.prd.list.invalidate({ projectId }),
   });
 
+  // Snapshot undo data so it survives aiEdit being cleared by the view
+  const undoRef = useRef<{ documentType: "plan" | "prd"; documentId: string; preEditContent: string } | null>(null);
+  if (!undoRef.current && aiEdit) {
+    undoRef.current = {
+      documentType: aiEdit.documentType,
+      documentId: aiEdit.documentId,
+      preEditContent: aiEdit.preEditContent,
+    };
+  }
+
   const toolError = (tool.output as { status?: string; error?: string } | undefined)?.status === "error";
   const errorMessage = (tool.output as { error?: string } | undefined)?.error;
 
   const handleUndo = async () => {
-    if (!aiEdit || undone) return;
-    // Use documentId from tool output (guaranteed correct from execute) over aiEdit
+    const undo = undoRef.current;
+    if (!undo || undone) return;
+    // Use documentId from tool output (guaranteed correct from execute) over snapshot
     // which may have captured a truncated streaming ID
     const output = tool.output as { documentId?: string } | undefined;
-    const docId = output?.documentId ?? aiEdit.documentId;
-    if (!docId || !aiEdit.preEditContent) return;
-    if (aiEdit.documentType === "plan") {
-      await planUpdate.mutateAsync({ id: docId, content: aiEdit.preEditContent });
+    const docId = output?.documentId ?? undo.documentId;
+    if (!docId || !undo.preEditContent) return;
+    if (undo.documentType === "plan") {
+      await planUpdate.mutateAsync({ id: docId, content: undo.preEditContent });
     } else {
-      await prdUpdate.mutateAsync({ id: docId, content: aiEdit.preEditContent });
+      await prdUpdate.mutateAsync({ id: docId, content: undo.preEditContent });
     }
     setUndone(true);
     clearAiEdit();
