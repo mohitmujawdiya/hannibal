@@ -2,7 +2,7 @@ import { tool, jsonSchema } from "ai";
 
 export const askFollowUpTool = tool({
   description:
-    "Ask the user ONE strategic clarifying question with 2-4 mutually exclusive options before generating an artifact. The question must uncover a STRATEGIC DIMENSION (business model, go-to-market, scope, competitive positioning, stage) that reshapes the entire output — not a feature preference. Options must be directions the user must choose BETWEEN, never features they'd want to combine. Litmus test: if the user could say 'I want all of these', rethink the question. Never ask more than one follow-up per turn.",
+    "Ask the user a strategic clarifying question with 2-4 mutually exclusive options before generating an artifact. Use up to 3 rounds (one question per turn) to gather enough context — after each answer, re-evaluate which of the 5 context criteria (topic, audience, angle, type, scope) are still missing and ask about the next most impactful dimension. The question must uncover a STRATEGIC DIMENSION (business model, go-to-market, scope, competitive positioning, stage, target audience segment, plan type) that reshapes the entire output — not a feature preference. Options must be directions the user must choose BETWEEN, never features they'd want to combine. Litmus test: if the user could say 'I want all of these', rethink the question.",
   inputSchema: jsonSchema<{
     question: string;
     options: Array<{ label: string; description: string }>;
