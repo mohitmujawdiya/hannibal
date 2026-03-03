@@ -291,6 +291,15 @@ model RoadmapItem {
   @@map("roadmap_items")
 }
 
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String   @default("landing")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("waitlist_entries")
+}
+
 model RoadmapDependency {
   id         String         @id @default(cuid())
   fromItemId String         @map("from_item_id")
