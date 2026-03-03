@@ -2,7 +2,7 @@ import { tool, jsonSchema } from "ai";
 
 export const askFollowUpTool = tool({
   description:
-    "Ask the user a strategic clarifying question with 2-4 options before generating an artifact. The question should uncover the MOST IMPORTANT missing context — the one thing that would change 80% of the output. Ask about differentiation, target user, scope, or strategic angle — NOT surface-level categorization. Never ask more than one follow-up per turn.",
+    "Ask the user ONE strategic clarifying question with 2-4 mutually exclusive options before generating an artifact. The question must uncover a STRATEGIC DIMENSION (business model, go-to-market, scope, competitive positioning, stage) that reshapes the entire output — not a feature preference. Options must be directions the user must choose BETWEEN, never features they'd want to combine. Litmus test: if the user could say 'I want all of these', rethink the question. Never ask more than one follow-up per turn.",
   inputSchema: jsonSchema<{
     question: string;
     options: Array<{ label: string; description: string }>;
@@ -12,11 +12,11 @@ export const askFollowUpTool = tool({
       question: {
         type: "string",
         description:
-          "A specific, strategic question that uncovers missing context. BAD: 'What's the primary focus?' (too vague, leads to generic categories). GOOD: 'What makes your bedtime stories app different from what already exists?' (uncovers differentiation, which shapes every section of the plan).",
+          "A question about a strategic decision that changes the entire plan's shape. Ask about business model, go-to-market, competitive positioning, scope, or stage — NEVER about which features to include (all relevant features belong in the artifact regardless). BAD: 'What should the app focus on?' (invites feature-picking). GOOD: 'What's the business context?' or 'How will this reach users?' (shapes strategy).",
       },
       options: {
         type: "array",
-        description: "2-4 options, each representing a meaningfully different strategic direction",
+        description: "2-4 mutually exclusive strategic directions. Each must be something the user chooses BETWEEN, not features they'd want to combine.",
         minItems: 2,
         maxItems: 4,
         items: {
@@ -25,12 +25,12 @@ export const askFollowUpTool = tool({
             label: {
               type: "string",
               description:
-                "Concise option label (2-6 words) that names a specific approach, not a generic category. BAD: 'Content Variety'. GOOD: 'AI-generated personalized stories'.",
+                "Concise label (2-8 words) naming a strategic direction. BAD: 'Workout tracking' (feature). GOOD: 'VC-backed Peloton competitor' (strategic direction).",
             },
             description: {
               type: "string",
               description:
-                "1-2 sentences explaining what this direction means concretely — what would be built, for whom, and why it matters. Every option MUST have a description.",
+                "1-2 sentences explaining the strategic implications — how this direction changes priorities, approach, scope, and what success looks like. NOT a feature description.",
             },
           },
           required: ["label", "description"],

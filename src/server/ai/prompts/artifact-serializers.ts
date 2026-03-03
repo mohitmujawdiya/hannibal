@@ -147,6 +147,64 @@ function firstMeaningfulLine(markdown: string, maxLen = 150): string {
   return "";
 }
 
+const STRATEGIC_HEADINGS = [
+  "problem statement",
+  "overview",
+  "market opportunity",
+  "vision",
+  "executive summary",
+  "introduction",
+  "background",
+  "summary",
+];
+
+/**
+ * Extracts the first meaningful paragraph from a strategic section
+ * (Problem Statement, Overview, etc.) for richer Tier 2 summaries.
+ */
+function extractStrategicSummary(markdown: string, maxLen = 200): string {
+  const lines = markdown.split("\n");
+  let inStrategicSection = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Check if this is a heading matching our strategic headings
+    const headingMatch = trimmed.match(/^#{1,3}\s+(.+)/);
+    if (headingMatch) {
+      const headingText = headingMatch[1].trim().toLowerCase();
+      inStrategicSection = STRATEGIC_HEADINGS.some((h) => headingText.includes(h));
+      continue;
+    }
+
+    if (!inStrategicSection) continue;
+
+    // Skip empty lines and formatting
+    if (
+      !trimmed ||
+      trimmed.startsWith("---") ||
+      (trimmed.startsWith("**") && trimmed.endsWith("**"))
+    ) {
+      continue;
+    }
+
+    // Found a content line in a strategic section
+    const clean = trimmed.replace(/^[-*]\s+/, "").replace(/^\d+\.\s+/, "");
+    if (clean.length > 20) {
+      return clean.length > maxLen ? clean.slice(0, maxLen) + "..." : clean;
+    }
+  }
+
+  // Fall back to firstMeaningfulLine if no strategic section found
+  return firstMeaningfulLine(markdown, maxLen);
+}
+
+function completenessLabel(headingCount: number): string {
+  if (headingCount >= 5) return "comprehensive";
+  if (headingCount >= 3) return "partial";
+  return "minimal";
+}
+
 function countLeaves(
   nodes: { children?: { children?: unknown[] }[] }[],
 ): { total: number; leaves: number } {
@@ -226,13 +284,13 @@ function summarizeMarkdownArtifact(
 ): string {
   const words = countWords(content);
   const headings = extractHeadings(content);
-  const opener = firstMeaningfulLine(content);
+  const summary = extractStrategicSummary(content);
   const sectionLine =
     headings.length > 0
-      ? `\n  Sections: ${headings.join(", ")}`
+      ? `\n  Sections (${headings.length}, ${completenessLabel(headings.length)}): ${headings.join(", ")}`
       : "";
-  const openerLine = opener ? `\n  Opens with: "${opener}"` : "";
-  return `[${label}] "${title}" (id: ${id}) — ${words} words${sectionLine}${openerLine}`;
+  const summaryLine = summary ? `\n  Summary: ${summary}` : "";
+  return `[${label}] "${title}" (id: ${id}) — ${words} words${sectionLine}${summaryLine}`;
 }
 
 export function summarizeArtifact(artifact: StoredArtifact): string {

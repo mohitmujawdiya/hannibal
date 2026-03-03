@@ -84,7 +84,7 @@ export async function POST(req: Request) {
     },
     stopWhen: stepCountIs(5),
     temperature: 0.7,
-    maxOutputTokens: 8192,
+    maxOutputTokens: 16384,
   });
 
   return result.toUIMessageStreamResponse();

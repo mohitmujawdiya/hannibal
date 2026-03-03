@@ -63,9 +63,24 @@ export function createReadAllArtifactsTool(artifacts: StoredArtifact[]) {
         return { content: "No artifacts exist in this project yet." };
       }
 
+      const TOTAL_CAP = 80_000;
+      const perArtifactLimit = Math.min(
+        16_000,
+        Math.floor(TOTAL_CAP / artifacts.length),
+      );
+
       const sections = artifacts
-        .map((a) => serializeFullArtifact(a, 16000))
+        .map((a) => serializeFullArtifact(a, perArtifactLimit))
         .join("\n\n---\n\n");
+
+      if (sections.length > TOTAL_CAP) {
+        return {
+          count: artifacts.length,
+          content:
+            sections.slice(0, TOTAL_CAP) +
+            "\n\n...(output truncated — use readArtifact to fetch specific artifacts in full)",
+        };
+      }
 
       return {
         count: artifacts.length,
