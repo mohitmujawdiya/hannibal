@@ -34,7 +34,12 @@ export default clerkMiddleware(async (auth, request) => {
   }
 
   if (!isPublicRoute(request)) {
-    await auth.protect();
+    // Allow API/tRPC requests from demo visitors — the demo cookie is set,
+    // and the tRPC context / chat route handle demo auth fallback themselves
+    const hasDemoCookie = request.cookies.get(DEMO_COOKIE)?.value === "true";
+    if (!hasDemoCookie) {
+      await auth.protect();
+    }
   }
 });
 
