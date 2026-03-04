@@ -1,3 +1,5 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 
@@ -8,6 +10,12 @@ export default async function DemoLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Authenticated users should use their own workspace, not the demo
+  const { userId } = await auth();
+  if (userId) {
+    redirect("/");
+  }
+
   const project = await db.project.findUnique({
     where: { slug: DEMO_PROJECT_SLUG },
     select: { id: true, slug: true, name: true, deletedAt: true },
