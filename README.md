@@ -2,7 +2,7 @@
 
 AI-native product management platform. Think "Cursor for PMs" — an LLM co-pilot that assists through the entire product lifecycle, from problem discovery to roadmap planning.
 
-**[Try the demo](/demo)** — no sign-up required.
+**[Try the demo](https://hannibal-gamma.vercel.app/demo)** — no sign-up required.
 
 ## What it does
 
