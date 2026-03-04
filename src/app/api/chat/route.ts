@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import { openai } from "@ai-sdk/openai";
 import {
   streamText,
@@ -12,20 +13,39 @@ import { artifactTools } from "@/server/ai/tools/generate-artifact";
 import { createReadArtifactTool, createReadAllArtifactsTool } from "@/server/ai/tools/read-artifact";
 import { createEditPlanTool, createEditPrdTool } from "@/server/ai/tools/edit-artifact";
 import { askFollowUpTool } from "@/server/ai/tools/ask-follow-up";
-import { chatLimiter, getRateLimitIdentifier, rateLimitResponse } from "@/lib/rate-limit";
+import { chatLimiter, demoChatLimiter, getRateLimitIdentifier, rateLimitResponse } from "@/lib/rate-limit";
 import { loadProjectArtifacts } from "@/server/services/project-context";
+
+const DEMO_USER_ID = process.env.DEMO_USER_ID;
 
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const { userId } = await auth();
+  let userId: string | null = null;
+  let isDemo = false;
+
+  const { userId: clerkUserId } = await auth();
+  userId = clerkUserId;
+
+  // Demo fallback: if no Clerk session, check for demo cookie
+  if (!userId && DEMO_USER_ID) {
+    const cookieStore = await cookies();
+    const demoCookie = cookieStore.get("hannibal-demo");
+    if (demoCookie?.value === "true") {
+      userId = DEMO_USER_ID;
+      isDemo = true;
+    }
+  }
+
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  if (chatLimiter) {
+  // Use stricter rate limiting for demo users
+  const limiter = isDemo ? (demoChatLimiter ?? chatLimiter) : chatLimiter;
+  if (limiter) {
     const id = getRateLimitIdentifier(userId, req);
-    const { success, reset } = await chatLimiter.limit(id);
+    const { success, reset } = await limiter.limit(id);
     if (!success) return rateLimitResponse(reset);
   }
 

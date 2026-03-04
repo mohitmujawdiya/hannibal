@@ -25,6 +25,15 @@ export const chatLimiter = redis
     })
   : null;
 
+// Stricter rate limit for demo users: 10 messages per hour
+export const demoChatLimiter = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, "1 h"),
+      prefix: "rl:demo-chat",
+    })
+  : null;
+
 export const trpcLimiter = redis
   ? new Ratelimit({
       redis,

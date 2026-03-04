@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   LayoutDashboard,
   FileText,
@@ -12,6 +13,7 @@ import {
   Search,
   Settings,
   PanelLeftClose,
+  LogIn,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
@@ -28,6 +30,7 @@ type SidebarProps = {
   projectId: string;
   projectName?: string;
   collapsed?: boolean;
+  isDemo?: boolean;
 };
 
 const viewItems: { id: ViewType; label: string; icon: React.ElementType }[] = [
@@ -42,7 +45,7 @@ const viewItems: { id: ViewType; label: string; icon: React.ElementType }[] = [
   { id: "roadmap", label: "Roadmap", icon: Map },
 ];
 
-export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
+export function Sidebar({ projectId, projectName, collapsed, isDemo }: SidebarProps) {
   const activeView = useWorkspaceContext((s) => s.activeView);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
   const toggleSidebar = useWorkspaceContext((s) => s.toggleSidebar);
@@ -62,9 +65,11 @@ export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
         </div>
 
         {/* Project switcher */}
-        <div className="flex items-center justify-center py-2">
-          <ProjectSwitcher projectId={projectId} collapsed />
-        </div>
+        {!isDemo && (
+          <div className="flex items-center justify-center py-2">
+            <ProjectSwitcher projectId={projectId} collapsed />
+          </div>
+        )}
         <Separator className="w-10" />
 
         {/* View icons */}
@@ -92,7 +97,17 @@ export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
         {/* Bottom */}
         <Separator className="w-10" />
         <div className="flex flex-col items-center gap-1 py-3">
-          <UserButton appearance={{ elements: { avatarBox: "h-7 w-7" } }} />
+          {isDemo ? (
+            <Link
+              href="/sign-up"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors"
+              title="Sign Up"
+            >
+              <LogIn className="h-4 w-4" />
+            </Link>
+          ) : (
+            <UserButton appearance={{ elements: { avatarBox: "h-7 w-7" } }} />
+          )}
         </div>
       </div>
     );
@@ -117,7 +132,13 @@ export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
 
       {/* Project switcher */}
       <div className="px-3 py-3">
-        <ProjectSwitcher projectId={projectId} />
+        {isDemo ? (
+          <div className="flex items-center gap-2 rounded-md border border-border/50 px-3 py-2">
+            <span className="text-sm font-medium truncate">{projectName ?? "Demo Project"}</span>
+          </div>
+        ) : (
+          <ProjectSwitcher projectId={projectId} />
+        )}
       </div>
 
       <ScrollArea className="flex-1 px-2">
@@ -152,10 +173,21 @@ export function Sidebar({ projectId, projectName, collapsed }: SidebarProps) {
       {/* Bottom */}
       <Separator />
       <div className="flex items-center gap-2 px-4 py-3">
-        <UserButton appearance={{ elements: { avatarBox: "h-6 w-6" } }} />
-        <Button variant="ghost" size="icon" className="ml-auto h-7 w-7">
-          <Settings className="h-4 w-4" />
-        </Button>
+        {isDemo ? (
+          <Button variant="outline" size="sm" className="w-full gap-1.5" asChild>
+            <Link href="/sign-up">
+              <LogIn className="h-3.5 w-3.5" />
+              Sign Up
+            </Link>
+          </Button>
+        ) : (
+          <>
+            <UserButton appearance={{ elements: { avatarBox: "h-6 w-6" } }} />
+            <Button variant="ghost" size="icon" className="ml-auto h-7 w-7">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

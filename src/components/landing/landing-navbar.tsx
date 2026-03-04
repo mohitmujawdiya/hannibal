@@ -22,15 +22,20 @@ export function LandingNavbar() {
           </div>
           <span className="text-sm font-semibold">Hannibal</span>
         </Link>
-        {isSignedIn ? (
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/">Open App</Link>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/demo">Try Demo</Link>
           </Button>
-        ) : (
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/sign-in">Sign In</Link>
-          </Button>
-        )}
+          {isSignedIn ? (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/">Open App</Link>
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/sign-in">Sign In</Link>
+            </Button>
+          )}
+        </div>
       </div>
     </motion.header>
   );

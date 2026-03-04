@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PanelRightOpen } from "lucide-react";
+import Link from "next/link";
+import { PanelRightOpen, ExternalLink } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -19,9 +20,10 @@ type WorkspaceShellProps = {
   projectId: string;
   projectName?: string;
   projectSlug: string;
+  isDemo?: boolean;
 };
 
-export function WorkspaceShell({ projectId, projectName, projectSlug }: WorkspaceShellProps) {
+export function WorkspaceShell({ projectId, projectName, projectSlug, isDemo }: WorkspaceShellProps) {
   const [mounted, setMounted] = useState(false);
   const sidebarOpen = useWorkspaceContext((s) => s.sidebarOpen);
   const aiPanelOpen = useWorkspaceContext((s) => s.aiPanelOpen);
@@ -55,10 +57,23 @@ export function WorkspaceShell({ projectId, projectName, projectSlug }: Workspac
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
+      {/* Demo banner */}
+      {isDemo && (
+        <div className="flex h-9 items-center justify-center gap-3 bg-blue-600 px-4 text-sm text-white shrink-0">
+          <span>You&apos;re viewing a demo project</span>
+          <Link
+            href="/sign-up"
+            className="inline-flex items-center gap-1 rounded-md bg-white/20 px-2.5 py-0.5 text-xs font-medium hover:bg-white/30 transition-colors"
+          >
+            Sign Up <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden">
       {/* Collapsed sidebar — fixed width, outside resizable group */}
       {!sidebarOpen && (
-        <Sidebar projectId={projectId} projectName={projectName} collapsed />
+        <Sidebar projectId={projectId} projectName={projectName} collapsed isDemo={isDemo} />
       )}
       <ResizablePanelGroup orientation="horizontal">
         {sidebarOpen && (
@@ -68,7 +83,7 @@ export function WorkspaceShell({ projectId, projectName, projectSlug }: Workspac
               minSize="12%"
               maxSize="22%"
             >
-              <Sidebar projectId={projectId} projectName={projectName} />
+              <Sidebar projectId={projectId} projectName={projectName} isDemo={isDemo} />
             </ResizablePanel>
             <ResizableHandle />
           </>
@@ -107,6 +122,7 @@ export function WorkspaceShell({ projectId, projectName, projectSlug }: Workspac
           </div>
         )}
       </ResizablePanelGroup>
+      </div>
     </div>
   );
 }

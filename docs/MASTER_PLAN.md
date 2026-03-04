@@ -36,11 +36,13 @@ Three-panel workspace with AI context bridge:
 +----------+----------------------+--------------+
 ```
 
-- **Sidebar**: Project switcher + view navigation
+- **Sidebar**: Project switcher + view navigation (founder flow order: Overview → Plan → Research → Competitors → Personas → PRD → Features → Priorities → Roadmap)
 - **Main Content**: Active view (11 views planned, 8 built)
-- **AI Panel**: Persistent chat with expert PM persona, context-aware of active view, generates artifacts
+- **AI Panel**: Persistent chat with expert PM persona, context-aware of active view, generates artifacts, asks follow-up questions before generating, can edit saved docs in-place
 - **Context Bridge**: Zustand store connects all panels — AI knows what you're looking at
+- **Clean URLs**: Projects use slugs (`/my-project/plan`) with bidirectional view-URL sync
 - **Three-Tier Context**: AI receives full content for active-view artifacts, summaries for others, with on-demand drill-down via tools
+- **Demo Mode**: `/demo` route provides full workspace access with a pre-seeded project, no sign-up required (cookie-based auth fallback)
 
 ---
 
@@ -49,10 +51,13 @@ Three-panel workspace with AI context bridge:
 ### Infrastructure
 - [x] Three-panel workspace shell with resizable panels
 - [x] Project switcher dropdown (real DB, create/switch projects)
+- [x] Clean URLs with project slugs (`/my-project/plan`) and bidirectional view-URL sync
 - [x] AI chat panel with streaming (GPT-4o via Vercel AI SDK v6)
 - [x] Artifact generation + "Push to View" flow
-- [x] tRPC v11 + Prisma 7 + PostgreSQL backend (12 models, 8 routers)
-- [x] Zustand stores for UI state (workspace-context, artifact-store, project-store)
+- [x] AI follow-up questions (human-in-the-loop strategic clarification with clickable options before artifact generation)
+- [x] AI in-place editing (editPlan/editPRD tools stream updated content live into the detail view)
+- [x] tRPC v11 + Prisma 7 + PostgreSQL backend (13 models, 8 routers)
+- [x] Zustand stores for UI state (workspace-context with AiEditState + requestAiFocus, artifact-store, project-store)
 - [x] Context bridge connecting views <-> AI panel
 - [x] Conversation persistence (chat history saved to DB, restored per project)
 - [x] Three-tier artifact context (Tier 1: full content for active view, Tier 2: summaries, on-demand: readArtifact tools)
@@ -60,22 +65,29 @@ Three-panel workspace with AI context bridge:
 - [x] Project context loading (saved artifacts from DB injected into AI system prompt)
 - [x] Parser extras catch-all (unrecognized AI-generated sections render instead of being silently dropped)
 - [x] Web search integration (Tavily API with source citations)
-- [x] Rate limiting (Upstash)
-- [x] Clerk auth with dark theme styling
+- [x] Rate limiting (Upstash, with stricter limits for demo users)
+- [x] Clerk auth with dark theme styling, invitation-only sign-up
+- [x] Landing page with waitlist signup (motion/react animations, HeroSection, FeatureCards, HowItWorks)
+- [x] Admin waitlist page with Clerk invitation flow
+- [x] Hard delete with 10-second undo toasts for all artifacts and projects
+- [x] Manual artifact creation + AI-focused empty states ("Generate with AI" / "Start from Scratch" CTAs)
+- [x] Demo mode (`/demo` route — cookie-based auth fallback, pre-seeded project, no sign-up required, stricter rate limiting)
 
 ### Editor
 - [x] MarkdownDoc component (react-markdown view + textarea edit mode, replaced Novel/Tiptap)
-- [x] Used for Plan and PRD editing
+- [x] Multi-document support for Plans and PRDs (card grid list view + detail view with section cards or raw markdown toggle)
+- [x] Editable titles (inline rename)
+- [x] Live AI edit streaming with animated indicator
 
 ### Views (8 of 11 complete)
 - [x] **Overview / Dashboard** — project health, artifact coverage, RICE highlights, recent activity, roadmap pulse
-- [x] **Plan Editor** — markdown-based with MarkdownDoc, soft delete + undo
+- [x] **Plan Editor** — multi-doc list + detail view (section cards / raw markdown), AI editing, soft delete + undo
 - [x] **PRD Editor** — same architecture as Plan, linkable to Plan
-- [x] **Feature Tree** — @xyflow/react + dagre layout, full CRUD, undo/redo, keyboard shortcuts
+- [x] **Feature Tree** — @xyflow/react + dagre layout, full CRUD, undo/redo, keyboard shortcuts, undo-toast delete
 - [x] **Priority Matrix** — RICE scoring, ranked/grouped modes, AI suggestions with evidence-based rationales
 - [x] **Personas** — card-based with structured fields (goals, frustrations, behaviors, decision-making context), inline editing, AI generation, extras catch-all
 - [x] **Competitors** — card-based with structured fields (strengths, weaknesses, feature gaps, strategic trajectory), web research, AI generation, extras catch-all
-- [x] **Roadmap** — dnd-timeline + dnd-kit, swim lanes, milestones, dependencies, import features from tree
+- [x] **Roadmap** — dnd-timeline + dnd-kit, swim lanes, milestones, dependencies, import features from tree, undo-toast delete
 - [ ] **Research Tracker** — stub only
 - [ ] **Kanban Board** — placeholder (maps to Overview)
 - [ ] **Feedback Inbox** — not started
@@ -85,16 +97,20 @@ The AI system has evolved beyond the original plan. Key patterns now in place:
 
 1. **Expert Prompt System** — The AI acts as a senior PM (not a generic assistant). Each tool carries expert-level quality criteria: plans must have quantified problem statements and phased timelines with validation gates; PRDs must have Given/When/Then acceptance criteria; personas must include decision-making context with switching costs.
 
-2. **Three-Tier Artifact Context** — The system prompt includes artifact state tiered by relevance to the active view:
+2. **Follow-Up Questions** — Before generating artifacts, the AI asks strategic clarifying questions using a human-in-the-loop `askFollowUp` tool. Users see 2-4 clickable options inline in the chat (plus an "Other..." custom input). The AI can ask up to 3 rounds of follow-ups before generating, adapting its output to the user's strategic direction.
+
+3. **AI In-Place Editing** — `editPlan` and `editPRD` tools let the AI edit existing saved documents. The full updated markdown streams into the workspace-context `AiEditState`, and the detail view shows a live animated preview while locking out manual editing.
+
+4. **Three-Tier Artifact Context** — The system prompt includes artifact state tiered by relevance to the active view:
    - Tier 1: Full serialized content for artifacts matching the active view (up to 8K chars)
    - Tier 2: One-line summaries for all other artifacts (type, title, counts)
    - On-demand: `readArtifact` / `readAllArtifacts` tools fetch full content when the AI needs cross-artifact context
 
-3. **Flexible Section Structure** — Tool descriptions frame sections as "typical sections — include all that apply, skip or add as context demands." The AI adapts structure to the specific product rather than forcing a rigid template.
+5. **Flexible Section Structure** — Tool descriptions frame sections as "typical sections — include all that apply, skip or add as context demands." The AI adapts structure to the specific product rather than forcing a rigid template.
 
-4. **Extras Catch-All** — Persona and competitor parsers capture unrecognized bold-labeled sections via `extractUnrecognizedSections()`, so new AI-generated sections render in the card UI instead of being silently dropped. Known fields keep structured pretty rendering; unknown extras get neutral text blocks.
+6. **Extras Catch-All** — Persona and competitor parsers capture unrecognized bold-labeled sections via `extractUnrecognizedSections()`, so new AI-generated sections render in the card UI instead of being silently dropped. Known fields keep structured pretty rendering; unknown extras get neutral text blocks.
 
-5. **Conversation Persistence** — Chat history saved to DB per project, restored on return. Messages serialized via dedicated utility. Project context (all saved artifacts) loaded server-side and injected into the system prompt.
+7. **Conversation Persistence** — Chat history saved to DB per project, restored on return. Messages serialized via dedicated utility. Project context (all saved artifacts) loaded server-side and injected into the system prompt.
 
 ---
 
@@ -202,6 +218,7 @@ Context-aware AI that proactively helps:
 *Make the "idea to plan" journey feel magical for first-time founders.*
 
 #### 4A. Guided Onboarding
+- [x] **Demo mode** — `/demo` route gives anyone a full interactive experience with a pre-seeded sample project, no sign-up required. Middleware sets a cookie; tRPC/chat fall back to a demo user ID when no Clerk session exists. Landing page links to demo via "Try Demo" buttons.
 - "Start from an idea" wizard — describe your idea in plain text, AI generates initial plan + personas + competitor list
 - "Import customer discovery" — paste interview notes or survey results, AI extracts personas + insights + feature ideas
 - Progressive disclosure — don't show all 11 views on day one, unlock as artifacts are created

@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "motion/react";
-import { Sparkles } from "lucide-react";
+import { Play, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SignupForm } from "./signup-form";
 
 const ease = [0.25, 0.1, 0.25, 1] as const;
@@ -92,14 +94,20 @@ export function HeroSection() {
           Go from rough idea to full product plan in minutes — whether you&apos;re a founder brainstorming or a PM shipping.
         </motion.p>
 
-        {/* Signup form */}
+        {/* Signup form + Demo CTA */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6, ease }}
-          className="mt-8"
+          className="mt-8 flex flex-col items-center gap-3"
         >
           <SignupForm />
+          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" asChild>
+            <Link href="/demo">
+              <Play className="h-3.5 w-3.5" />
+              Try the demo
+            </Link>
+          </Button>
         </motion.div>
 
         {/* Workspace mock */}
