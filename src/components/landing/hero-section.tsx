@@ -81,7 +81,7 @@ export function HeroSection() {
           transition={{ duration: 0.6, delay: 0.4, ease }}
           className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl"
         >
-          Cursor for PMs.
+          Cursor for builders.
         </motion.h1>
 
         {/* Subheadline */}

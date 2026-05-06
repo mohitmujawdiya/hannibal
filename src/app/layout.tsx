@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Hannibal — AI Product Management",
-  description: "AI-native product management platform. Cursor for PMs.",
+  description: "AI-native product workspace. Cursor for builders — solo founders, product engineers, and small AI-native teams shipping from idea to launch.",
 };
 
 export default function RootLayout({

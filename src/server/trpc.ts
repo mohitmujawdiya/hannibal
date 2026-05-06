@@ -10,17 +10,23 @@ export type Context = {
   db: typeof db;
   userId: string | null;
   isDemo: boolean;
+  isPlayground: boolean;
 };
 
 export async function createContext(): Promise<Context> {
   const { userId } = await auth();
 
-  // Demo fallback: if no Clerk session, check for demo cookie
+  // Demo / Playground fallback: if no Clerk session, check the guest cookies.
+  // Both share DEMO_USER_ID but the chat route applies different rate limits.
   if (!userId && DEMO_USER_ID) {
     const cookieStore = await cookies();
     const demoCookie = cookieStore.get("hannibal-demo");
+    const playgroundCookie = cookieStore.get("hannibal-playground");
     if (demoCookie?.value === "true") {
-      return { db, userId: DEMO_USER_ID, isDemo: true };
+      return { db, userId: DEMO_USER_ID, isDemo: true, isPlayground: false };
+    }
+    if (playgroundCookie?.value === "true") {
+      return { db, userId: DEMO_USER_ID, isDemo: false, isPlayground: true };
     }
   }
 
@@ -28,6 +34,7 @@ export async function createContext(): Promise<Context> {
     db,
     userId,
     isDemo: false,
+    isPlayground: false,
   };
 }
 

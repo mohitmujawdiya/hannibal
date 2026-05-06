@@ -1,6 +1,6 @@
 # Hannibal
 
-AI-native product management platform. Think "Cursor for PMs" — an LLM co-pilot that assists through the entire product lifecycle, from problem discovery to roadmap planning.
+AI-native product workspace. Think "Cursor for builders" — an LLM co-pilot that assists solo founders, product engineers, and small AI-native teams through the entire product lifecycle, from problem discovery to roadmap planning.
 
 **[Try the demo](https://hannibal-gamma.vercel.app/demo)** — no sign-up required.
 

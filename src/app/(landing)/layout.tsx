@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Hannibal — Cursor for PMs",
+  title: "Hannibal — Cursor for builders",
   description:
     "The AI workspace where product strategy writes itself. Join as a founding member.",
 };

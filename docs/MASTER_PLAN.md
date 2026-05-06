@@ -1,7 +1,7 @@
 # Hannibal — Master Plan
 
-> "Cursor for PMs and Founders."
-> An AI-native workspace where product managers and startup founders go from idea to shipped product — with AI that understands the full picture.
+> "Cursor for builders."
+> An AI-native workspace where solo founders, product engineers, and small AI-native teams go from idea to shipped product — with AI that understands the full picture.
 
 ---
 

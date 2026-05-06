@@ -1,7 +1,7 @@
 # Hannibal — AI-Native Product Management Platform
 
 ## Product
-"Cursor for PMs." An AI-native workspace where product managers create plans, PRDs, feature trees, roadmaps, personas, and competitive analysis — with AI assistance throughout.
+"Cursor for builders." An AI-native workspace where solo founders, product engineers, and small AI-native teams create plans, PRDs, feature trees, roadmaps, personas, and competitive analysis — with AI assistance throughout.
 
 ## Tech Stack
 - Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS 4, shadcn/ui
@@ -118,6 +118,13 @@ The system prompt includes artifact state tiered by relevance to the active view
 
 ### Expert Prompt Pattern
 Tool descriptions use expert personas with per-section quality criteria rather than format-only instructions. Section headings are framed as "typical sections (include all that apply, skip or add as context demands)" so the AI can adapt structure to context.
+
+### Guest Routes — `/demo` and `/playground`
+Two unauthenticated entry points share `DEMO_USER_ID` but track different cookies and serve different intents:
+- **`/demo`** — populated showcase project (slug from `DEMO_PROJECT_SLUG`). Stricter chat rate limit (`demoChatLimiter`). Cookie: `hannibal-demo`. Used to show "this is what Hannibal looks like populated."
+- **`/playground`** — empty sandbox auto-created on first visit (slug from `PLAYGROUND_PROJECT_SLUG`, e.g. for evaluation links you send to a hiring manager). Normal chat rate limit. Cookie: `hannibal-playground`. The layout `findFirst`s the project under `DEMO_USER_ID` and creates it if missing or undeletes it if soft-deleted.
+
+Both routes redirect authenticated users to `/`. `proxy.ts` sets the relevant cookie and exempts both paths from `auth.protect()`. tRPC context (`src/server/trpc.ts`) and the chat route (`src/app/api/chat/route.ts`) both check for either cookie and fall back to `DEMO_USER_ID`. `WorkspaceShell` renders a different banner per mode (`isDemo` vs `isPlayground`).
 
 ### Model Router (Auto by default)
 `src/server/ai/model-router.ts` picks the OpenAI model per request:

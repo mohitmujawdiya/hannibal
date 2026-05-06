@@ -2,6 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 const DEMO_COOKIE = "hannibal-demo";
+const PLAYGROUND_COOKIE = "hannibal-playground";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -10,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)",
   "/api/waitlist(.*)",
   "/demo(.*)",
+  "/playground(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
@@ -33,11 +35,28 @@ export default clerkMiddleware(async (auth, request) => {
     return response;
   }
 
+  // Set playground cookie for /playground routes — same auth fallback as demo,
+  // but tracked separately so the chat route can apply normal (not stricter) rate
+  // limits and tRPC can pick the right project.
+  if (pathname === "/playground" || pathname.startsWith("/playground/")) {
+    const response = NextResponse.next();
+    if (!request.cookies.get(PLAYGROUND_COOKIE)) {
+      response.cookies.set(PLAYGROUND_COOKIE, "true", {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+      });
+    }
+    return response;
+  }
+
   if (!isPublicRoute(request)) {
-    // Allow API/tRPC requests from demo visitors — the demo cookie is set,
-    // and the tRPC context / chat route handle demo auth fallback themselves
+    // Allow API/tRPC requests from demo or playground visitors — those cookies
+    // are set, and the tRPC context / chat route handle the auth fallback.
     const hasDemoCookie = request.cookies.get(DEMO_COOKIE)?.value === "true";
-    if (!hasDemoCookie) {
+    const hasPlaygroundCookie =
+      request.cookies.get(PLAYGROUND_COOKIE)?.value === "true";
+    if (!hasDemoCookie && !hasPlaygroundCookie) {
       await auth.protect();
     }
   }

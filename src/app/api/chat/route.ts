@@ -26,17 +26,25 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   let userId: string | null = null;
   let isDemo = false;
+  let isPlayground = false;
 
   const { userId: clerkUserId } = await auth();
   userId = clerkUserId;
 
-  // Demo fallback: if no Clerk session, check for demo cookie
+  // Demo / Playground fallback: if no Clerk session, check guest cookies.
+  // Both share DEMO_USER_ID; only /demo (showcase project) gets stricter rate
+  // limits. /playground (evaluation/sandbox link) uses normal rate limits so
+  // the visitor can actually generate things.
   if (!userId && DEMO_USER_ID) {
     const cookieStore = await cookies();
     const demoCookie = cookieStore.get("hannibal-demo");
+    const playgroundCookie = cookieStore.get("hannibal-playground");
     if (demoCookie?.value === "true") {
       userId = DEMO_USER_ID;
       isDemo = true;
+    } else if (playgroundCookie?.value === "true") {
+      userId = DEMO_USER_ID;
+      isPlayground = true;
     }
   }
 
@@ -44,13 +52,15 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // Use stricter rate limiting for demo users
+  // Stricter rate limit for /demo only. Playground uses normal limit.
   const limiter = isDemo ? (demoChatLimiter ?? chatLimiter) : chatLimiter;
   if (limiter) {
     const id = getRateLimitIdentifier(userId, req);
     const { success, reset } = await safeLimit(limiter, id);
     if (!success) return rateLimitResponse(reset);
   }
+  // Avoid unused-var lint on isPlayground while the value is reserved for future routing decisions
+  void isPlayground;
 
   const body = await req.json();
   const {
