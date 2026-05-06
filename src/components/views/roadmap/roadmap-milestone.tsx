@@ -64,6 +64,7 @@ export function RoadmapMilestone({ item, span, onClick }: RoadmapMilestoneProps)
             isDragging && "opacity-40",
           )}
           onClick={handleClick}
+          title={item.title}
         >
           <div
             className={cn(
@@ -72,7 +73,9 @@ export function RoadmapMilestone({ item, span, onClick }: RoadmapMilestoneProps)
               status.textColor.replace("text-", "border-"),
             )}
           />
-          <span className="text-sm font-medium whitespace-nowrap">{item.title}</span>
+          <span className="text-sm font-medium whitespace-nowrap">
+            {item.title}
+          </span>
         </div>
       </div>
     </div>

@@ -16,7 +16,7 @@ import {
   max as dateMax,
   isValid,
 } from "date-fns";
-import type { ItemDefinition, Span, GridSizeDefinition } from "dnd-timeline";
+import type { ItemDefinition, Range as DndRange, Span, GridSizeDefinition } from "dnd-timeline";
 import type { RoadmapItem, RoadmapItemStatus, RoadmapTimeScale } from "./artifact-types";
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -64,6 +64,68 @@ export function spanToDateStrings(span: Span): { startDate: string; endDate: str
     startDate: msToDateString(span.start),
     endDate: msToDateString(span.end),
   };
+}
+
+// ─── Subrow grouping with milestone-title-aware stacking ─────────────
+
+/**
+ * Greedy first-fit subrow assignment. Returns `{ [laneId]: subrows[] }` where
+ * each subrow is a list of items that don't visually overlap.
+ *
+ * Differs from dnd-timeline's built-in `groupItemsToSubrows` in one crucial
+ * way: milestones get a virtual right-side buffer equal to ~12% of the
+ * visible range, approximating the on-screen pixel width of the trailing
+ * title text. Without this, two milestones a few days apart end up in the
+ * same subrow and their titles render on top of each other — exactly the
+ * overlap bug in the screenshot.
+ *
+ * Bars use their actual span (their title is constrained by the bar width
+ * via `truncate`, so they don't bleed visually).
+ */
+export function groupItemsToSubrowsByVisualOverlap(
+  items: TimelineItemDef[],
+  range: DndRange,
+): Record<string, TimelineItemDef[][]> {
+  const rangeSpan = range.end - range.start;
+  // ~12% of visible range per milestone title — empirically about the width of
+  // the truncated max-w-[200px] title at typical font size and zoom levels.
+  const milestoneTitleBuffer = rangeSpan * 0.12;
+
+  const visualEnd = (def: TimelineItemDef): number => {
+    if (def.roadmapItem.type === "milestone") {
+      return def.span.start + milestoneTitleBuffer;
+    }
+    return def.span.end;
+  };
+
+  const byLane: Record<string, TimelineItemDef[]> = {};
+  for (const item of items) {
+    if (!byLane[item.rowId]) byLane[item.rowId] = [];
+    byLane[item.rowId].push(item);
+  }
+
+  const result: Record<string, TimelineItemDef[][]> = {};
+  for (const [laneId, laneItems] of Object.entries(byLane)) {
+    laneItems.sort((a, b) => a.span.start - b.span.start);
+    const subrows: TimelineItemDef[][] = [];
+
+    for (const item of laneItems) {
+      let placed = false;
+      for (const subrow of subrows) {
+        const last = subrow[subrow.length - 1];
+        if (visualEnd(last) <= item.span.start) {
+          subrow.push(item);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) subrows.push([item]);
+    }
+
+    result[laneId] = subrows;
+  }
+
+  return result;
 }
 
 // ─── Auto time-scale selection ───────────────────────────────────────

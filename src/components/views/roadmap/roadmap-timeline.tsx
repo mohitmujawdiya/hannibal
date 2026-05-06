@@ -4,7 +4,6 @@ import { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import {
   TimelineContext,
   useTimelineContext,
-  groupItemsToSubrows,
   type DragEndEvent,
   type DragStartEvent,
   type ResizeEndEvent,
@@ -19,6 +18,7 @@ import {
   effectiveTimeScale,
   itemToTimelineDef,
   spanToDateStrings,
+  groupItemsToSubrowsByVisualOverlap,
   LANE_COLORS,
   generateId,
   SNAP_GRID,
@@ -235,7 +235,7 @@ function TimelineInner({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const groupedSubrows = useMemo(
-    () => groupItemsToSubrows(timelineItems, range),
+    () => groupItemsToSubrowsByVisualOverlap(timelineItems, range),
     [timelineItems, range],
   );
 
