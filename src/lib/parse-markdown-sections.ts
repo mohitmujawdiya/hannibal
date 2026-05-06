@@ -48,54 +48,18 @@ const DEFAULT_COLORS = [
 ];
 
 /**
- * Normalize content so that section markers the AI emitted as bold inline
- * (`**Problem Statement**`) or as a bare known-section name on its own line
- * (`Problem Statement\n...`) get rewritten to proper `## H2` headings before
- * splitting. Defense in depth — the AI is told to use `##` in the tool
- * description but isn't always perfect.
- */
-function normalizeSectionMarkers(content: string): string {
-  let out = content;
-
-  // 1. `**Section Name**` at the start of a line (with optional `:` or `—`
-  //    suffix) → `## Section Name`.
-  out = out.replace(
-    /^\*\*([^*\n]{1,80})\*\*\s*[:—–-]?\s*$/gm,
-    (_, name: string) => {
-      const key = name.trim().toLowerCase();
-      if (key in KNOWN_SECTIONS) return `## ${name.trim()}`;
-      return _;
-    },
-  );
-
-  // 2. Bare known section name on its own line, with no other markdown
-  //    formatting around it. Only rewrite when followed by content (a blank
-  //    line then text, or text on the next line). Skip this if the line is
-  //    already a heading or list item.
-  const knownNames = Object.keys(KNOWN_SECTIONS);
-  const escaped = knownNames
-    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-    .join("|");
-  const bareLine = new RegExp(`^(${escaped})\\s*[:—–-]?\\s*$`, "gim");
-  out = out.replace(bareLine, (_, name: string) => `## ${name.trim()}`);
-
-  return out;
-}
-
-/**
  * Split markdown content on `## ` headings into sections.
  * Each section gets an icon + color from the known map, or defaults.
  * The `# Title` line is skipped (it's rendered in the view header).
  */
 export function parseMarkdownSections(content: string): MarkdownSection[] {
-  const normalized = normalizeSectionMarkers(content);
-  const parts = normalized.split(/^## /m);
+  const parts = content.split(/^## /m);
   const sections: MarkdownSection[] = [];
   let defaultColorIdx = 0;
 
   for (const part of parts) {
     // First chunk before any ## heading — skip (it's the # title or preamble)
-    if (sections.length === 0 && !normalized.trimStart().startsWith("## ")) {
+    if (sections.length === 0 && !content.trimStart().startsWith("## ")) {
       // Check if this chunk has meaningful non-title content
       const lines = part.split("\n").filter(
         (l) => l.trim() && !l.startsWith("# "),
