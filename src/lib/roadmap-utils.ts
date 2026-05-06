@@ -66,63 +66,22 @@ export function spanToDateStrings(span: Span): { startDate: string; endDate: str
   };
 }
 
-// ─── Subrow grouping with milestone-title-aware stacking ─────────────
+// ─── Subrow grouping ─────────────────────────────────────────────────
 
 /**
- * Greedy first-fit subrow assignment. Returns `{ [laneId]: subrows[] }` where
- * each subrow is a list of items that don't visually overlap.
+ * Returns `{ [laneId]: subrows[] }` for the timeline.
  *
- * Differs from dnd-timeline's built-in `groupItemsToSubrows` in one crucial
- * way: milestones get a virtual right-side buffer equal to ~12% of the
- * visible range, approximating the on-screen pixel width of the trailing
- * title text. Without this, two milestones a few days apart end up in the
- * same subrow and their titles render on top of each other — exactly the
- * overlap bug in the screenshot.
- *
- * Bars use their actual span (their title is constrained by the bar width
- * via `truncate`, so they don't bleed visually).
+ * Bars share subrows when their time-spans don't overlap (greedy first-fit).
+ * Milestones each get their own subrow because their titles render past the
+ * diamond marker into adjacent items' space — and there's no portable way
+ * to know how much horizontal pixel space a title actually takes when the
+ * timeline width and font metrics vary. Always-own-subrow trades a little
+ * vertical space for guaranteed readability.
  */
-// Measure rendered pixel width of milestone titles using a shared canvas.
-// Variable-width fonts make character-count estimates wildly off (M is
-// ~13px, i is ~3px at text-sm), so we measure the actual string. Falls back
-// to a 9px/char estimate during SSR / when canvas is unavailable.
-let _measureCtx: CanvasRenderingContext2D | null | undefined;
-function measureTitlePx(title: string): number {
-  if (typeof document === "undefined") return title.length * 9;
-  if (_measureCtx === undefined) {
-    const c = document.createElement("canvas").getContext("2d");
-    if (c) {
-      // Match the milestone title's CSS: text-sm font-medium → 14px/500 weight,
-      // Geist Sans (via the app's font stack).
-      c.font =
-        '500 14px var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-    }
-    _measureCtx = c;
-  }
-  if (!_measureCtx) return title.length * 9;
-  return _measureCtx.measureText(title).width;
-}
-
 export function groupItemsToSubrowsByVisualOverlap(
   items: TimelineItemDef[],
-  range: DndRange,
+  _range: DndRange,
 ): Record<string, TimelineItemDef[][]> {
-  const rangeSpan = range.end - range.start;
-  // Convert measured title width (px) to time-equivalent buffer. Assume the
-  // timeline area is ~1200px wide for the visible range; we err high on
-  // stacking (cheap, just an extra subrow) over collision (expensive in
-  // readability). Add 28px for the diamond marker + gap.
-  const ASSUMED_TIMELINE_PX = 1200;
-  const titleBufferFor = (title: string) =>
-    ((measureTitlePx(title) + 28) / ASSUMED_TIMELINE_PX) * rangeSpan;
-
-  const visualEnd = (def: TimelineItemDef): number => {
-    if (def.roadmapItem.type === "milestone") {
-      return def.span.start + titleBufferFor(def.roadmapItem.title);
-    }
-    return def.span.end;
-  };
-
   const byLane: Record<string, TimelineItemDef[]> = {};
   for (const item of items) {
     if (!byLane[item.rowId]) byLane[item.rowId] = [];
@@ -135,10 +94,18 @@ export function groupItemsToSubrowsByVisualOverlap(
     const subrows: TimelineItemDef[][] = [];
 
     for (const item of laneItems) {
+      if (item.roadmapItem.type === "milestone") {
+        // Each milestone gets its own subrow — no sharing.
+        subrows.push([item]);
+        continue;
+      }
+      // Bars: first-fit into a subrow that doesn't yet contain a milestone
+      // and whose last item ends before this one starts.
       let placed = false;
       for (const subrow of subrows) {
+        if (subrow[0].roadmapItem.type === "milestone") continue;
         const last = subrow[subrow.length - 1];
-        if (visualEnd(last) <= item.span.start) {
+        if (last.span.end <= item.span.start) {
           subrow.push(item);
           placed = true;
           break;
