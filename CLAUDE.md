@@ -133,6 +133,15 @@ Both routes redirect authenticated users to `/`. `proxy.ts` sets the relevant co
 - `temperatureFor(model)` returns `undefined` for o-series (which constrain temperature) and `0.7` for everything else.
 - Model picker in `ai-panel.tsx` exposes the choices; default state is "auto".
 
+### Client-Side Caching
+- `providers.tsx` sets a global `staleTime: 30_000` and `refetchOnWindowFocus: false` on the QueryClient. View switches within 30s read from cache instead of refetching.
+- `WorkspaceShell` prefetches the six artifact list queries (plan/prd/persona/competitor/feature.tree/roadmap.list) on project mount. tRPC's `httpBatchLink` coalesces them into a single HTTP request, so the cache is warm regardless of which view the user lands on (covers URL-direct visits like `/<project>/plan`).
+- Mutations explicitly invalidate the relevant list query in `onSuccess`, so writes still reflect immediately. The 30s window only affects re-mounts of components reading the same key.
+- `WorkspaceSkeleton` is a static layout placeholder (no shimmer animation) — animated skeletons made brief mount delays feel longer than they were.
+
+### Undo / Redo
+`useUndoRedo<T>` in `src/hooks/use-undo-redo.ts` is a generic history stack used by both the feature tree and the roadmap. The caller snapshots state before each user action and calls `undo(current)` / `redo(current)` to swap it. Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z keyboard handlers in each view, plus toolbar buttons in the same grouped-border style. For the roadmap, the snapshot is `{ lanes, items }` and `handleUpdate` is the single mutation point that funnels every drag, resize, save, delete, lane rename, import, and time-scale change — so one push covers everything.
+
 ### Sync-Service Performance
 `feature.syncTree` and `roadmap.syncFull` write many rows in one transaction. They were rewritten to parallelize:
 - Updates run in parallel (`Promise.all`) — no inter-row dependencies.

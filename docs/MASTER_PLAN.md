@@ -75,6 +75,10 @@ Three-panel workspace with AI context bridge:
 - [x] Playground mode (`/playground` route — empty sandbox auto-created on first visit, separate cookie, normal rate limit; intended for evaluation links to a single recipient)
 - [x] Parallelized sync transactions — `feature.syncTree` and `roadmap.syncFull` rewrote serial loops as `Promise.all` batches (creates in waves for tree to honor parent→child deps); 10s tx timeout
 - [x] Defensive markdown rendering — section-card view auto-handles minor AI formatting drift in plan/PRD output
+- [x] Undo/redo for roadmap (Cmd+Z / Cmd+Shift+Z, toolbar buttons) — shared `useUndoRedo` hook with feature tree
+- [x] Client-side caching: 30s query staleTime + workspace-level prefetch of all six artifact list queries (one batched request) + static skeleton placeholder so view switches no longer trigger refetches
+- [x] Roadmap rendering: each milestone gets its own subrow (no overlap detection), so titles never collide regardless of length or zoom
+- [x] Roadmap Pulse fallback: shows the next 3 future items when nothing is overdue or due in 2 weeks (instead of the misleading "create a roadmap" empty state)
 
 ### Editor
 - [x] MarkdownDoc component (react-markdown view + textarea edit mode, replaced Novel/Tiptap)
