@@ -138,49 +138,72 @@ export async function syncFeatureTree(
     walkNode(child, null, i, null);
   });
 
-  // 4. Execute in transaction. Default Prisma timeout is 5000ms; bump to 30s
-  // because we serialize tx.feature.create() per-node to capture IDs for child
-  // parent links, and a deeply-nested tree + remote DB (Neon) latency can blow
-  // past 5s easily. 30s is a safe ceiling for an interactive save.
+  // 4. Execute in transaction. Updates have no inter-row dependencies, so
+  // parallelize them to avoid blowing past Prisma's 5s default. Creates have
+  // parent→child dependencies (parents must exist before children reference
+  // them), so they run in waves: nodes whose parent is resolved → create
+  // batch → record IDs → next wave. Within a wave, creates run in parallel.
   return db.$transaction(async (tx) => {
-    // Update existing features
-    for (const update of updates) {
-      await tx.feature.update({
-        where: { id: update.id },
-        data: {
-          title: update.title,
-          description: update.description,
-          riceReach: update.riceReach,
-          riceImpact: update.riceImpact,
-          riceConfidence: update.riceConfidence,
-          riceEffort: update.riceEffort,
-          riceScore: update.riceScore,
-          parentId: update.parentId,
-          order: update.order,
-        },
-      });
-    }
+    // Update existing features — fully parallel, no inter-row dependencies.
+    await Promise.all(
+      updates.map((update) =>
+        tx.feature.update({
+          where: { id: update.id },
+          data: {
+            title: update.title,
+            description: update.description,
+            riceReach: update.riceReach,
+            riceImpact: update.riceImpact,
+            riceConfidence: update.riceConfidence,
+            riceEffort: update.riceEffort,
+            riceScore: update.riceScore,
+            parentId: update.parentId,
+            order: update.order,
+          },
+        }),
+      ),
+    );
 
-    // Create new features (in order so parents are created before children)
-    for (const create of creates) {
-      const resolvedParentId =
-        create.parentId ??
-        (create.parentTempKey ? tempKeyToId.get(create.parentTempKey) ?? null : null);
-      const created = await tx.feature.create({
-        data: {
-          title: create.title,
-          description: create.description,
-          riceReach: create.riceReach,
-          riceImpact: create.riceImpact,
-          riceConfidence: create.riceConfidence,
-          riceEffort: create.riceEffort,
-          riceScore: create.riceScore,
-          parentId: resolvedParentId,
-          order: create.order,
-          projectId,
-        },
-      });
-      tempKeyToId.set(create.tempKey, created.id);
+    // Create new features in waves. A create is "ready" when it has either no
+    // tempKey parent (parent already exists in the DB or is null) OR the
+    // tempKey parent has been created in a previous wave. This handles
+    // arbitrarily deep nested new subtrees in O(depth) round trips.
+    const remaining = [...creates];
+    while (remaining.length > 0) {
+      const ready: typeof creates = [];
+      const next: typeof creates = [];
+      for (const c of remaining) {
+        if (!c.parentTempKey || tempKeyToId.has(c.parentTempKey)) ready.push(c);
+        else next.push(c);
+      }
+      if (ready.length === 0) {
+        // Defensive: shouldn't happen with a well-formed walk, but avoid an
+        // infinite loop if the input had an unresolvable parentTempKey.
+        break;
+      }
+      const createdRows = await Promise.all(
+        ready.map((c) =>
+          tx.feature.create({
+            data: {
+              title: c.title,
+              description: c.description,
+              riceReach: c.riceReach,
+              riceImpact: c.riceImpact,
+              riceConfidence: c.riceConfidence,
+              riceEffort: c.riceEffort,
+              riceScore: c.riceScore,
+              parentId:
+                c.parentId ??
+                (c.parentTempKey ? tempKeyToId.get(c.parentTempKey) ?? null : null),
+              order: c.order,
+              projectId,
+            },
+          }),
+        ),
+      );
+      ready.forEach((c, i) => tempKeyToId.set(c.tempKey, createdRows[i].id));
+      remaining.length = 0;
+      remaining.push(...next);
     }
 
     // Soft-delete features that were not touched
