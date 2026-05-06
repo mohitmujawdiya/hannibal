@@ -199,7 +199,9 @@ export function useDashboardData(projectId: string): DashboardData {
         createdAt: new Date(a.createdAt).getTime(),
       }));
 
-    // Roadmap pulse
+    // Roadmap pulse — show overdue + next-2-weeks. If both are empty but the
+    // roadmap exists with future items, fall back to the next 3 items so the
+    // user can see something actionable.
     let overdueItems: RoadmapDeadline[] = [];
     let upcomingItems: RoadmapDeadline[] = [];
 
@@ -212,25 +214,31 @@ export function useDashboardData(projectId: string): DashboardData {
       const todayStr = today.toISOString().slice(0, 10);
       const twoWeeksStr = twoWeeksOut.toISOString().slice(0, 10);
 
+      const futureItems: RoadmapDeadline[] = [];
       for (const item of roadmap.items) {
         if (item.status === "done") continue;
+        const deadline: RoadmapDeadline = {
+          title: item.title,
+          endDate: item.endDate,
+          status: item.status,
+        };
         if (item.endDate < todayStr) {
-          overdueItems.push({
-            title: item.title,
-            endDate: item.endDate,
-            status: item.status,
-          });
+          overdueItems.push(deadline);
         } else if (item.endDate <= twoWeeksStr) {
-          upcomingItems.push({
-            title: item.title,
-            endDate: item.endDate,
-            status: item.status,
-          });
+          upcomingItems.push(deadline);
+        } else {
+          futureItems.push(deadline);
         }
       }
 
       overdueItems.sort((a, b) => a.endDate.localeCompare(b.endDate));
       upcomingItems.sort((a, b) => a.endDate.localeCompare(b.endDate));
+
+      // Fall back to nearest future items if nothing is overdue/upcoming.
+      if (overdueItems.length === 0 && upcomingItems.length === 0) {
+        futureItems.sort((a, b) => a.endDate.localeCompare(b.endDate));
+        upcomingItems = futureItems.slice(0, 3);
+      }
     }
 
     const hasArtifacts =

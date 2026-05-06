@@ -18,12 +18,14 @@ function formatDate(dateStr: string): string {
 type RoadmapPulseProps = {
   overdueItems: RoadmapDeadline[];
   upcomingItems: RoadmapDeadline[];
+  hasRoadmap: boolean;
   onNavigate: (view: ViewType) => void;
 };
 
 export function RoadmapPulse({
   overdueItems,
   upcomingItems,
+  hasRoadmap,
   onNavigate,
 }: RoadmapPulseProps) {
   const empty = overdueItems.length === 0 && upcomingItems.length === 0;
@@ -37,7 +39,9 @@ export function RoadmapPulse({
         {empty ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
             <Map className="h-4 w-4" />
-            Create a roadmap to track deadlines
+            {hasRoadmap
+              ? "All roadmap items are done"
+              : "Create a roadmap to track deadlines"}
           </div>
         ) : (
           <div className="space-y-3">

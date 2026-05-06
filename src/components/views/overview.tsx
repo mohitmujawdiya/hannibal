@@ -43,6 +43,7 @@ function Dashboard({ projectId, onNavigate }: { projectId: string; onNavigate: (
           <RoadmapPulse
             overdueItems={data.overdueItems}
             upcomingItems={data.upcomingItems}
+            hasRoadmap={data.coverage.roadmap}
             onNavigate={onNavigate}
           />
         </div>
