@@ -49,6 +49,9 @@ import {
   ProposeConfirmCard,
   type ProposeConfirmAnswer,
 } from "@/components/ai/propose-confirm-card";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { localChatStore } from "@/lib/chat-persistence";
 import { sanitizeUrl } from "@/lib/sanitize-url";
 import type { Artifact, FeatureNode, RoadmapArtifact, RoadmapItem } from "@/lib/artifact-types";
@@ -395,7 +398,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
                         return (
                           <div
                             key={i}
-                            className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm !max-w-none w-full break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_code]:text-xs"
+                            className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm !max-w-none w-full break-words [overflow-wrap:anywhere] [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_code]:text-xs [&_table]:text-xs [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_hr]:border-border/50 [&_hr]:my-3"
                           >
                             <MessageMarkdown content={part.text} />
                           </div>
@@ -1159,112 +1162,37 @@ function getUserText(message: { content?: string; parts?: { type: string; text?:
   return fromParts || message.content || "";
 }
 
+// Render assistant chat text via react-markdown so the AI's GFM output
+// (tables, italics, nested lists, blockquotes, strikethrough, etc.) renders
+// correctly. The wrapping <div> uses Tailwind Typography prose classes that
+// style the produced HTML; we only override links so they open safely in a
+// new tab and route through sanitizeUrl.
 function MessageMarkdown({ content }: { content: string }) {
-  const parts = content.split(/(```[\s\S]*?```)/g);
-
   return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith("```")) {
-          const lines = part.slice(3, -3).split("\n");
-          const lang = lines[0]?.trim();
-          const code = lang ? lines.slice(1).join("\n") : lines.join("\n");
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeSanitize]}
+      components={{
+        a: ({ href, children, ...props }) => {
+          const safe = href ? sanitizeUrl(href) : null;
+          if (!safe) return <span>{children}</span>;
           return (
-            <pre key={i} className="bg-muted p-3 rounded-lg overflow-x-auto">
-              <code className="text-xs">{code}</code>
-            </pre>
+            <a
+              {...props}
+              href={safe}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              {children}
+            </a>
           );
-        }
-
-        return part.split("\n").map((line, j) => {
-          const key = `${i}-${j}`;
-
-          if (line.startsWith("#### "))
-            return (
-              <h4 key={key} className="font-semibold text-xs mt-2 mb-1">
-                {formatInline(line.slice(5))}
-              </h4>
-            );
-          if (line.startsWith("### "))
-            return (
-              <h3 key={key} className="font-semibold mt-3 mb-1">
-                {formatInline(line.slice(4))}
-              </h3>
-            );
-          if (line.startsWith("## "))
-            return (
-              <h2 key={key} className="font-semibold mt-3 mb-1">
-                {formatInline(line.slice(3))}
-              </h2>
-            );
-          if (line.startsWith("# "))
-            return (
-              <h1 key={key} className="font-bold mt-3 mb-1">
-                {formatInline(line.slice(2))}
-              </h1>
-            );
-          if (line.match(/^[-*]\s/))
-            return (
-              <li key={key} className="ml-4 list-disc">
-                {formatInline(line.slice(2))}
-              </li>
-            );
-          if (line.match(/^\d+\.\s/))
-            return (
-              <li key={key} className="ml-4 list-decimal">
-                {formatInline(line.replace(/^\d+\.\s/, ""))}
-              </li>
-            );
-          if (line.trim() === "") return <br key={key} />;
-
-          return (
-            <p key={key} className="mb-1">
-              {formatInline(line)}
-            </p>
-          );
-        });
-      })}
-    </>
+        },
+      }}
+    >
+      {content}
+    </ReactMarkdown>
   );
-}
-
-function formatInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*.*?\*\*|`.*?`|\[.*?\]\(.*?\))/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**"))
-      return (
-        <strong key={i} className="font-semibold">
-          {part.slice(2, -2)}
-        </strong>
-      );
-    if (part.startsWith("`") && part.endsWith("`"))
-      return (
-        <code
-          key={i}
-          className="bg-muted px-1 py-0.5 rounded text-xs font-mono"
-        >
-          {part.slice(1, -1)}
-        </code>
-      );
-    const linkMatch = part.match(/\[(.*?)\]\((.*?)\)/);
-    if (linkMatch) {
-      const safeHref = sanitizeUrl(linkMatch[2]);
-      if (safeHref)
-        return (
-          <a
-            key={i}
-            href={safeHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary underline underline-offset-2"
-          >
-            {linkMatch[1]}
-          </a>
-        );
-      return <span key={i}>{linkMatch[1]}</span>;
-    }
-    return part;
-  });
 }
 
 type PriorityScore = {
