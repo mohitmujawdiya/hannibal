@@ -56,16 +56,24 @@ export function parseMarkdownSections(content: string): MarkdownSection[] {
   const parts = content.split(/^## /m);
   const sections: MarkdownSection[] = [];
   let defaultColorIdx = 0;
+  const startsWithHeading = content.trimStart().startsWith("## ");
 
-  for (const part of parts) {
-    // First chunk before any ## heading — skip (it's the # title or preamble)
-    if (sections.length === 0 && !content.trimStart().startsWith("## ")) {
-      // Check if this chunk has meaningful non-title content
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    const isFirst = i === 0;
+
+    // First chunk is everything before the first `## ` (the title line + any
+    // preamble). If the doc doesn't start with `## ` and has meaningful non-
+    // title content here, render it as a synthesized "Overview" card.
+    if (isFirst) {
+      if (startsWithHeading) {
+        // First part is empty; the first real section comes in part[1].
+        continue;
+      }
       const lines = part.split("\n").filter(
         (l) => l.trim() && !l.startsWith("# "),
       );
       if (lines.length > 0) {
-        // There's content before the first ## heading — render as "Overview"
         const body = lines.join("\n").trim();
         const known = KNOWN_SECTIONS["overview"];
         sections.push({
