@@ -1,21 +1,22 @@
 // Model routing engine — picks the right OpenAI model for each request based on
-// active view, recent message intent, and the user's "Auto" / explicit choice.
+// recent message intent and the user's "Auto" / explicit choice.
 //
-// Philosophy: PMs don't know gpt-5.4 vs o3 vs gpt-5-pro. The system should default
-// to the right model for the task; the user can override when they want.
+// NOTE: gpt-5-pro and o3 are TEMPORARILY DISABLED. They routinely take 2-5
+// minutes to generate full artifacts, and Vercel Hobby caps function execution
+// at 60s. Re-enable when you upgrade to Vercel Pro (300s default, 800s with
+// Fluid Compute) by:
+//   1. adding "gpt-5-pro" and "o3" back to ALLOWED_MODELS below
+//   2. adding them back to MODEL_OPTIONS in ai-panel.tsx
+//   3. uncommenting the REASONING_VIEWS / REASONING_KEYWORDS / HIGH_QUALITY_KEYWORDS
+//      branches in routeModel()
 //
-// Routing rules (ordered, first match wins):
-// - Reasoning-heavy intent (priorities/RICE/scoring/strategic analysis) → o3
-// - Quick edit/refine intent → gpt-5.4-mini
-// - "Make it great" intent (deep, thorough, comprehensive) → gpt-5-pro
-// - Default → gpt-5.4 (flagship balanced)
+// While disabled, all "auto" traffic stays on the fast gpt-5.4 family —
+// gpt-5.4-mini for quick edits, gpt-5.4 for everything else.
 
 export const ALLOWED_MODELS = [
   "auto",
   "gpt-5.4",
   "gpt-5.4-mini",
-  "gpt-5-pro",
-  "o3",
   "gpt-4o",
 ] as const;
 
@@ -28,16 +29,8 @@ type RoutingContext = {
   messageText?: string;
 };
 
-const REASONING_VIEWS = new Set(["priorities"]);
-
-const REASONING_KEYWORDS =
-  /\b(rice|prioritize|prioritise|score|scoring|rank|rank.?ed|trade.?off|opportunity cost|impact.?effort|reason about|strategic analysis|pros.?and.?cons|cost.benefit|decision matrix)\b/i;
-
 const QUICK_EDIT_KEYWORDS =
   /\b(refine|edit|polish|tweak|adjust|small change|quick fix|update this|change the|fix the|reword|rephrase|tidy)\b/i;
-
-const HIGH_QUALITY_KEYWORDS =
-  /\b(deep|thorough|comprehensive|detailed|exhaustive|in[- ]?depth|high.?quality|polished|production.?grade|investor.?ready|publish.?ready)\b/i;
 
 export function routeModel(
   requested: string | undefined,
@@ -52,16 +45,8 @@ export function routeModel(
     return requested as Exclude<AllowedModel, "auto">;
   }
 
-  // Auto routing.
+  // Auto routing — gpt-5.4 family only until pro/o3 are re-enabled.
   const text = ctx.messageText ?? "";
-  const view = ctx.activeView ?? "";
-
-  if (REASONING_VIEWS.has(view) || REASONING_KEYWORDS.test(text)) {
-    return "o3";
-  }
-  if (HIGH_QUALITY_KEYWORDS.test(text)) {
-    return "gpt-5-pro";
-  }
   if (QUICK_EDIT_KEYWORDS.test(text)) {
     return "gpt-5.4-mini";
   }

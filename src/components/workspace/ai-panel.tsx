@@ -62,12 +62,13 @@ type AiPanelProps = {
   projectId: string;
 };
 
+// gpt-5-pro and o3 are temporarily disabled — they routinely exceed Vercel
+// Hobby's 60s function timeout. Re-enable when on Vercel Pro / Fluid Compute
+// (also restore the routing branches in src/server/ai/model-router.ts).
 const MODEL_OPTIONS = [
   { id: "auto", label: "Auto" },
   { id: "gpt-5.4", label: "GPT-5.4" },
   { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
-  { id: "gpt-5-pro", label: "GPT-5 Pro" },
-  { id: "o3", label: "o3 (reasoning)" },
   { id: "gpt-4o", label: "GPT-4o (legacy)" },
 ] as const;
 
