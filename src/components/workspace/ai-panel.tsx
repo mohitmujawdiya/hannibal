@@ -84,6 +84,10 @@ export function AiPanel({ projectId }: AiPanelProps) {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  // After submit we want to anchor the new user message at the top of the
+  // chat viewport (so the user sees their question + AI response flowing
+  // below it) instead of pinning scroll to bottom while the AI streams.
+  const pendingAnchorTopRef = useRef(false);
 
   useEffect(() => {
     if (focusAiInput > 0) {
@@ -206,8 +210,35 @@ export function AiPanel({ projectId }: AiPanelProps) {
   }, []);
 
   useEffect(() => {
-    if (isAtBottom.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    // After a fresh submit, anchor the just-sent user message at the top of
+    // the viewport so the user reads their question + AI response top-down
+    // instead of being pinned to the bottom of the streaming text.
+    if (pendingAnchorTopRef.current) {
+      pendingAnchorTopRef.current = false;
+      // Wait one frame so the new message is rendered and measurable.
+      requestAnimationFrame(() => {
+        const userMsgs = el.querySelectorAll<HTMLElement>('[data-message-role="user"]');
+        const last = userMsgs[userMsgs.length - 1];
+        if (last) {
+          // offsetTop is relative to the nearest positioned ancestor; the
+          // scroll container itself isn't necessarily that ancestor, so use
+          // getBoundingClientRect for an accurate offset.
+          const containerTop = el.getBoundingClientRect().top;
+          const messageTop = last.getBoundingClientRect().top;
+          const delta = messageTop - containerTop + el.scrollTop - 8;
+          el.scrollTo({ top: delta, behavior: "smooth" });
+          isAtBottom.current = false;
+          setShowScrollBtn(true);
+        }
+      });
+      return;
+    }
+
+    if (isAtBottom.current) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
 
@@ -233,8 +264,8 @@ export function AiPanel({ projectId }: AiPanelProps) {
     const text = input.trim();
     if (!text) return;
     setInput("");
-    isAtBottom.current = true;
-    setShowScrollBtn(false);
+    pendingAnchorTopRef.current = true;
+    isAtBottom.current = false;
     sendMessage({ text });
   }, [input, sendMessage]);
 
@@ -350,7 +381,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
             {messages.filter((message, index, arr) =>
               arr.findIndex((m) => m.id === message.id) === index
             ).map((message) => (
-              <div key={message.id} className="space-y-1">
+              <div key={message.id} data-message-id={message.id} data-message-role={message.role} className="space-y-1">
                 {message.role === "user" ? (
                   <div className="flex justify-end">
                     <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm text-primary-foreground">
