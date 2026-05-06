@@ -21,7 +21,12 @@ import { routeModel, temperatureFor } from "@/server/ai/model-router";
 
 const DEMO_USER_ID = process.env.DEMO_USER_ID;
 
-export const maxDuration = 60;
+// Bump to 300s (5 min). gpt-5-pro and o3 often run 2-5 min for full artifacts;
+// the previous 60s ceiling was killing responses mid-stream. Streaming still
+// flows token-by-token to the browser during this window — maxDuration is just
+// the upper bound on total function execution. Vercel Fluid Compute supports
+// up to 800s if we ever need to push higher.
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   let userId: string | null = null;
@@ -131,7 +136,11 @@ export async function POST(req: Request) {
       editPlan: createEditPlanTool(userId),
       editPRD: createEditPrdTool(userId),
     },
-    stopWhen: stepCountIs(5),
+    // Allow up to 8 tool-call → continuation cycles per turn. A common chain
+    // is webSearch → askFollowUp → (after answers) proposeAndConfirm → generate
+    // → summary, which is already 5 steps; this gives headroom for a second
+    // tool round if the AI needs more research after the follow-up.
+    stopWhen: stepCountIs(8),
     temperature: temperatureFor(model),
     maxOutputTokens: 16384,
   });
