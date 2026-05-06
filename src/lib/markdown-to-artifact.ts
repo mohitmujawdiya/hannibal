@@ -22,9 +22,13 @@ function extractBulletList(md: string, heading: string): string[] {
   return parseBulletLines(section);
 }
 
-/** Extract **Key:** value from a bold-field line. */
+/** Extract **Key:** value from a bold-field line. Tolerant of leading
+ *  whitespace and bullet markers (- * +) so `- **Key:** value` also matches. */
 function extractBoldField(md: string, key: string): string {
-  const pattern = new RegExp(`^\\*\\*${escapeRegex(key)}:\\*\\*\\s*(.+)$`, "m");
+  const pattern = new RegExp(
+    `^[\\s>*+\\-]*\\*\\*${escapeRegex(key)}:\\*\\*\\s*(.+)$`,
+    "mi",
+  );
   const match = md.match(pattern);
   return match ? match[1].trim() : "";
 }
