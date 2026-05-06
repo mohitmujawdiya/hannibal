@@ -101,12 +101,81 @@ function useSaveArtifact(projectId: string) {
   return { save, isPending };
 }
 
+function useArtifactSaved(
+  artifact: Artifact,
+  projectId: string,
+): { saved: boolean; savedId: string | null } {
+  // Each query is gated by artifact type so we only fetch what we need.
+  // Tanstack-query dedupes — the views already drive these list queries, so
+  // most cards hit a warm cache.
+  const planList = trpc.plan.list.useQuery(
+    { projectId },
+    { enabled: artifact.type === "plan" },
+  );
+  const prdList = trpc.prd.list.useQuery(
+    { projectId },
+    { enabled: artifact.type === "prd" },
+  );
+  const personaList = trpc.persona.list.useQuery(
+    { projectId },
+    { enabled: artifact.type === "persona" },
+  );
+  const competitorList = trpc.competitor.list.useQuery(
+    { projectId },
+    { enabled: artifact.type === "competitor" },
+  );
+  const featureTree = trpc.feature.tree.useQuery(
+    { projectId },
+    { enabled: artifact.type === "featureTree" },
+  );
+  const roadmapList = trpc.roadmap.list.useQuery(
+    { projectId },
+    { enabled: artifact.type === "roadmap" },
+  );
+
+  switch (artifact.type) {
+    case "plan": {
+      const m = planList.data?.find((p) => p.title === artifact.title);
+      return { saved: !!m, savedId: m?.id ?? null };
+    }
+    case "prd": {
+      const m = prdList.data?.find((p) => p.title === artifact.title);
+      return { saved: !!m, savedId: m?.id ?? null };
+    }
+    case "persona": {
+      const name = artifact.title || artifact.name || "";
+      const m = personaList.data?.find((p) => p.name === name);
+      return { saved: !!m, savedId: m?.id ?? null };
+    }
+    case "competitor": {
+      const name = artifact.title || artifact.name || "";
+      const m = competitorList.data?.find((c) => c.name === name);
+      return { saved: !!m, savedId: m?.id ?? null };
+    }
+    case "featureTree": {
+      // tree returns an array of root-level features. Saved if any exist.
+      const hasAny = (featureTree.data?.length ?? 0) > 0;
+      return { saved: hasAny, savedId: null };
+    }
+    case "roadmap": {
+      // One roadmap per project — saved if any exist
+      const first = roadmapList.data?.[0];
+      return { saved: !!first, savedId: first?.id ?? null };
+    }
+  }
+}
+
 export function ArtifactCard({ artifact, projectId }: { artifact: Artifact; projectId: string }) {
   const [expanded, setExpanded] = useState(false);
-  const [pushed, setPushed] = useState(false);
-  const [pushedId, setPushedId] = useState<string | null>(null);
   const setActiveView = useWorkspaceContext((s) => s.setActiveView);
   const { save, isPending } = useSaveArtifact(projectId);
+  const { saved: dbSaved, savedId: dbSavedId } = useArtifactSaved(artifact, projectId);
+  // Optimistic local state — flips immediately on click, then DB query refetch
+  // confirms. On reload, dbSaved kicks in alone.
+  const [optimisticSaved, setOptimisticSaved] = useState(false);
+  const [optimisticId, setOptimisticId] = useState<string | null>(null);
+  const pushed = optimisticSaved || dbSaved;
+  const pushedId = optimisticId ?? dbSavedId;
   const meta = artifactMeta[artifact.type];
   const Icon = meta.icon;
 
@@ -123,10 +192,10 @@ export function ArtifactCard({ artifact, projectId }: { artifact: Artifact; proj
     }
     try {
       const result = await save(artifact);
-      setPushed(true);
+      setOptimisticSaved(true);
       const resultId = result && !Array.isArray(result) && "id" in result ? result.id : null;
       if ((artifact.type === "plan" || artifact.type === "prd") && resultId) {
-        setPushedId(resultId);
+        setOptimisticId(resultId);
         setActiveView(meta.view, { type: artifact.type, id: resultId });
       } else {
         setActiveView(meta.view);
