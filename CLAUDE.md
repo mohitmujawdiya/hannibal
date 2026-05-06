@@ -105,7 +105,7 @@ Every view must:
 - OpenAI GPT-4o as primary model, Tavily API for web research
 - Single chat endpoint (`src/app/api/chat/route.ts`) orchestrates all AI via `streamText`
 - System prompt built dynamically in `src/server/ai/prompts/system.ts` with view context + artifact state
-- Tool definitions in `src/server/ai/tools/` (generate-artifact, read-artifact, web-search)
+- Tool definitions in `src/server/ai/tools/` (generate-artifact, read-artifact, web-search, ask-follow-up, ask-open-question, propose-and-confirm, edit-artifact)
 - Include `maxOutputTokens` and `temperature` explicitly
 - Artifacts are typed (`plan | prd | persona | featureTree | competitor | roadmap`), rendered inline in AI panel, saved to DB on "Push to View"
 
@@ -118,6 +118,14 @@ The system prompt includes artifact state tiered by relevance to the active view
 
 ### Expert Prompt Pattern
 Tool descriptions use expert personas with per-section quality criteria rather than format-only instructions. Section headings are framed as "typical sections (include all that apply, skip or add as context demands)" so the AI can adapt structure to context.
+
+### Follow-Up Engine (three asking tools)
+Clarification is handled by three human-in-the-loop tools, picked by the model based on question shape:
+- **`proposeAndConfirm`** (default when context allows a defensible guess): AI commits to an assumption with reasoning + 2-4 implications; user clicks Confirm / Refine / Replace. Most respectful of user time — shows the AI listened. Renderer: `src/components/ai/propose-confirm-card.tsx`.
+- **`askFollowUp`**: 1-4 batched questions per call, each with 2-4 problem-first options. Per-question `header` chip, `multiSelect` boolean, "(Recommended)" first-position pattern, "Other..." auto-injected. Schema: `{ questions: [{ question, header, options, multiSelect }] }`. Renderer: `src/components/ai/follow-up-card.tsx`.
+- **`askOpenQuestion`**: free-text prose for paragraph-shaped answers (research, anecdotes, constraints AI can't enumerate). Renderer: `src/components/ai/open-question-card.tsx`.
+
+Triggering rule: ask only on genuine ambiguity (problem-first dimensions: who/pain/wedge before plan-type/scope before MBA-bucket). Cap at 3 clarification turns per request. Auto-send on tool-output via `sendAutomaticallyWhen` in ai-panel; works for all three tools. Question forms whose subject is the product/AI/capabilities ("What unique AI capability...") are explicitly banned in the prompt — every clarifying question must put the user and their pain in the subject.
 
 ### Artifact Parsing & Extras Catch-All
 - Persona and competitor artifacts are stored as markdown but parsed into structured fields for card UI rendering

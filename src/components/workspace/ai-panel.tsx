@@ -44,6 +44,11 @@ import { useProjectFeatureTree, useProjectRoadmap } from "@/hooks/use-project-da
 import { useConversation } from "@/hooks/use-conversation";
 import { ArtifactCard } from "@/components/ai/artifact-card";
 import { FollowUpCard } from "@/components/ai/follow-up-card";
+import { OpenQuestionCard } from "@/components/ai/open-question-card";
+import {
+  ProposeConfirmCard,
+  type ProposeConfirmAnswer,
+} from "@/components/ai/propose-confirm-card";
 import { localChatStore } from "@/lib/chat-persistence";
 import { sanitizeUrl } from "@/lib/sanitize-url";
 import type { Artifact, FeatureNode, RoadmapArtifact, RoadmapItem } from "@/lib/artifact-types";
@@ -112,8 +117,9 @@ export function AiPanel({ projectId }: AiPanelProps) {
     sendAutomaticallyWhen: ({ messages: msgs }) => {
       const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
       if (!lastAssistant) return false;
-      // Only auto-send when askFollowUp is the LAST tool part (user just answered).
-      // After the continuation, generatePlan etc. become the last tool part → returns false.
+      // Only auto-send when one of the asking tools is the LAST tool part (user just
+      // answered). After the continuation, generatePlan etc. become the last tool part
+      // → returns false.
       const toolParts = lastAssistant.parts.filter(
         (p: { type?: string }) => p.type?.startsWith("tool-") || p.type === "dynamic-tool",
       );
@@ -123,10 +129,16 @@ export function AiPanel({ projectId }: AiPanelProps) {
         toolName?: string;
         state?: string;
       };
-      const isFollowUp =
-        last.type === "tool-askFollowUp" ||
-        (last.type === "dynamic-tool" && last.toolName === "askFollowUp");
-      return isFollowUp && last.state === "output-available";
+      const ASK_TOOLS = new Set([
+        "askFollowUp",
+        "askOpenQuestion",
+        "proposeAndConfirm",
+      ]);
+      const staticAskType =
+        last.type?.startsWith("tool-") && ASK_TOOLS.has(last.type.slice(5));
+      const dynamicAsk =
+        last.type === "dynamic-tool" && ASK_TOOLS.has(last.toolName ?? "");
+      return (staticAskType || dynamicAsk) && last.state === "output-available";
     },
   });
 
@@ -222,11 +234,36 @@ export function AiPanel({ projectId }: AiPanelProps) {
   }, [input, sendMessage]);
 
   const handleFollowUpAnswer = useCallback(
-    async (toolCallId: string, answer: string) => {
+    async (
+      toolCallId: string,
+      answers: Array<{ header: string; answer: string }>,
+    ) => {
       await addToolOutput({
         tool: "askFollowUp",
         toolCallId,
+        output: { answers },
+      });
+    },
+    [addToolOutput],
+  );
+
+  const handleOpenAnswer = useCallback(
+    async (toolCallId: string, answer: string) => {
+      await addToolOutput({
+        tool: "askOpenQuestion",
+        toolCallId,
         output: { answer },
+      });
+    },
+    [addToolOutput],
+  );
+
+  const handleProposeAnswer = useCallback(
+    async (toolCallId: string, answer: ProposeConfirmAnswer) => {
+      await addToolOutput({
+        tool: "proposeAndConfirm",
+        toolCallId,
+        output: answer,
       });
     },
     [addToolOutput],
@@ -329,7 +366,11 @@ export function AiPanel({ projectId }: AiPanelProps) {
                       }
                       const tool = extractToolInfo(part);
                       if (tool) {
-                        return renderToolPart(tool, i, projectId, handleFollowUpAnswer);
+                        return renderToolPart(tool, i, projectId, {
+                          onFollowUpAnswer: handleFollowUpAnswer,
+                          onOpenAnswer: handleOpenAnswer,
+                          onProposeAnswer: handleProposeAnswer,
+                        });
                       }
                       return null;
                     })}
@@ -487,41 +528,99 @@ function extractToolInfo(part: unknown): ToolInfo | null {
   return null;
 }
 
+type AskHandlers = {
+  onFollowUpAnswer?: (
+    toolCallId: string,
+    answers: Array<{ header: string; answer: string }>,
+  ) => void;
+  onOpenAnswer?: (toolCallId: string, answer: string) => void;
+  onProposeAnswer?: (toolCallId: string, answer: ProposeConfirmAnswer) => void;
+};
+
 function renderToolPart(
   tool: ToolInfo,
   key: number,
   projectId: string,
-  onFollowUpAnswer?: (toolCallId: string, answer: string) => void,
+  handlers: AskHandlers = {},
 ) {
+  const { onFollowUpAnswer, onOpenAnswer, onProposeAnswer } = handlers;
   const isComplete = tool.state === "output-available";
 
   if (tool.toolName === "askFollowUp") {
-    const question = (tool.input?.question as string) ?? "";
-    const options =
-      (tool.input?.options as Array<{ label: string; description?: string }>) ?? [];
+    // Normalize input: new shape is { questions: [...] }; legacy is { question, options }
+    type RawQuestion = {
+      question?: string;
+      header?: string;
+      options?: Array<{ label?: string; description?: string }>;
+      multiSelect?: boolean;
+    };
+    const rawNew = tool.input?.questions as RawQuestion[] | undefined;
+    const legacyQuestion = tool.input?.question as string | undefined;
+    const legacyOptions = tool.input?.options as
+      | Array<{ label: string; description?: string }>
+      | undefined;
+
+    const questions =
+      rawNew && rawNew.length > 0
+        ? rawNew
+            .filter(
+              (q): q is Required<Pick<RawQuestion, "question" | "options">> & RawQuestion =>
+                !!q.question && Array.isArray(q.options) && q.options.length >= 2,
+            )
+            .map((q) => ({
+              question: q.question!,
+              header: q.header ?? "",
+              options: (q.options ?? [])
+                .filter((o): o is { label: string; description?: string } => !!o.label)
+                .map((o) => ({ label: o.label, description: o.description })),
+              multiSelect: q.multiSelect ?? false,
+            }))
+        : legacyQuestion && legacyOptions && legacyOptions.length > 0
+          ? [
+              {
+                question: legacyQuestion,
+                header: "",
+                options: legacyOptions,
+                multiSelect: false,
+              },
+            ]
+          : [];
 
     if (isComplete) {
-      const answer = (tool.output?.answer as string) ?? "";
+      // Normalize output: new shape is { answers: [...] }; legacy is { answer }
+      const rawAnswers = tool.output?.answers as
+        | Array<{ header?: string; answer?: string }>
+        | undefined;
+      const legacyAnswer = tool.output?.answer as string | undefined;
+      const selectedAnswers =
+        rawAnswers && rawAnswers.length > 0
+          ? rawAnswers.map((a) => ({
+              header: a.header ?? "",
+              answer: a.answer ?? "",
+            }))
+          : legacyAnswer
+            ? [{ header: "", answer: legacyAnswer }]
+            : [];
       return (
         <FollowUpCard
           key={key}
-          question={question}
-          options={options}
+          questions={questions}
           disabled
-          selectedAnswer={answer}
-          onSelect={() => {}}
+          selectedAnswers={selectedAnswers}
+          onSubmit={() => {}}
         />
       );
     }
 
-    // Interactive state — input is fully available (question + options populated)
-    if (question && options.length > 0) {
+    // Interactive state — only render once at least one question has its options populated
+    if (questions.length > 0 && questions[0].options.length >= 2) {
       return (
         <FollowUpCard
           key={key}
-          question={question}
-          options={options}
-          onSelect={(answer) => onFollowUpAnswer?.(tool.toolCallId, answer)}
+          questions={questions}
+          onSubmit={(answers) =>
+            onFollowUpAnswer?.(tool.toolCallId, answers)
+          }
         />
       );
     }
@@ -532,6 +631,98 @@ function renderToolPart(
         key={key}
         icon={MessageCircleQuestion}
         label="Thinking"
+      />
+    );
+  }
+
+  if (tool.toolName === "askOpenQuestion") {
+    const question = (tool.input?.question as string) ?? "";
+    const header = (tool.input?.header as string) ?? "";
+    const placeholder = tool.input?.placeholder as string | undefined;
+    const context = tool.input?.context as string | undefined;
+
+    if (isComplete) {
+      const answer = (tool.output?.answer as string) ?? "";
+      return (
+        <OpenQuestionCard
+          key={key}
+          question={question}
+          header={header}
+          placeholder={placeholder}
+          context={context}
+          disabled
+          selectedAnswer={answer}
+          onSubmit={() => {}}
+        />
+      );
+    }
+
+    if (question) {
+      return (
+        <OpenQuestionCard
+          key={key}
+          question={question}
+          header={header}
+          placeholder={placeholder}
+          context={context}
+          onSubmit={(answer) => onOpenAnswer?.(tool.toolCallId, answer)}
+        />
+      );
+    }
+
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={MessageCircleQuestion}
+        label="Thinking"
+      />
+    );
+  }
+
+  if (tool.toolName === "proposeAndConfirm") {
+    const header = (tool.input?.header as string) ?? "";
+    const summary = (tool.input?.summary as string) ?? "";
+    const reasoning = (tool.input?.reasoning as string) ?? "";
+    const implications = (tool.input?.implications as string[] | undefined) ?? [];
+
+    if (isComplete) {
+      const out = tool.output as
+        | { decision?: string; note?: string }
+        | undefined;
+      const decision = (out?.decision ?? "confirm") as ProposeConfirmAnswer["decision"];
+      return (
+        <ProposeConfirmCard
+          key={key}
+          header={header}
+          summary={summary}
+          reasoning={reasoning}
+          implications={implications}
+          disabled
+          selectedAnswer={{ decision, note: out?.note }}
+          onSubmit={() => {}}
+        />
+      );
+    }
+
+    // Render once summary is populated (reasoning + implications may still stream in)
+    if (summary) {
+      return (
+        <ProposeConfirmCard
+          key={key}
+          header={header}
+          summary={summary}
+          reasoning={reasoning}
+          implications={implications}
+          onSubmit={(answer) => onProposeAnswer?.(tool.toolCallId, answer)}
+        />
+      );
+    }
+
+    return (
+      <ToolProgressCard
+        key={key}
+        icon={Sparkles}
+        label="Forming proposal"
       />
     );
   }

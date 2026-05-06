@@ -54,7 +54,7 @@ Three-panel workspace with AI context bridge:
 - [x] Clean URLs with project slugs (`/my-project/plan`) and bidirectional view-URL sync
 - [x] AI chat panel with streaming (GPT-4o via Vercel AI SDK v6)
 - [x] Artifact generation + "Push to View" flow
-- [x] AI follow-up questions (human-in-the-loop strategic clarification with clickable options before artifact generation)
+- [x] AI follow-up engine — three human-in-the-loop tools picked by question shape: `proposeAndConfirm` (default; AI commits to a defensible assumption, user picks Confirm/Refine/Replace), `askFollowUp` (1-4 batched constrained-option questions with multiSelect, header chips, "(Recommended)" first-position pattern), `askOpenQuestion` (prose answers for research/anecdotes/constraints). Problem-first prompt enforcement bans MBA-bucket framings ("VC-backed competitor", "What unique AI capability...") and requires question subjects to be the user, not the product.
 - [x] AI in-place editing (editPlan/editPRD tools stream updated content live into the detail view)
 - [x] tRPC v11 + Prisma 7 + PostgreSQL backend (13 models, 8 routers)
 - [x] Zustand stores for UI state (workspace-context with AiEditState + requestAiFocus, artifact-store, project-store)
@@ -97,7 +97,12 @@ The AI system has evolved beyond the original plan. Key patterns now in place:
 
 1. **Expert Prompt System** — The AI acts as a senior PM (not a generic assistant). Each tool carries expert-level quality criteria: plans must have quantified problem statements and phased timelines with validation gates; PRDs must have Given/When/Then acceptance criteria; personas must include decision-making context with switching costs.
 
-2. **Follow-Up Questions** — Before generating artifacts, the AI asks strategic clarifying questions using a human-in-the-loop `askFollowUp` tool. Users see 2-4 clickable options inline in the chat (plus an "Other..." custom input). The AI can ask up to 3 rounds of follow-ups before generating, adapting its output to the user's strategic direction.
+2. **Follow-Up Engine** — Clarification is handled by a dispatcher of three human-in-the-loop tools, picked by the model based on question shape:
+   - **`proposeAndConfirm`** (default) — AI commits to a defensible assumption with reasoning + 2-4 implications; user clicks Confirm / Refine / Replace. Most respectful of user time because it shows the AI listened and made a decision they can correct.
+   - **`askFollowUp`** — 1-4 batched questions per call with 2-4 problem-first options each, supports `multiSelect` and "(Recommended)" first-position pattern. Used when finite comparable options exist but no defensible single guess does.
+   - **`askOpenQuestion`** — free-text prose for paragraph-shaped answers (existing user research, anecdotes, constraints the AI can't enumerate).
+
+   The prompt enforces problem-first ordering (who-pain-wedge before plan-type/scope before MBA buckets), bans question forms whose subject is the product or its capabilities ("What unique AI capability differentiates the app?"), and requires wedge options to follow PAIN → WHY CURRENT BROKEN → HOW THIS FIXES IT structure. Cap at 3 clarification turns per request.
 
 3. **AI In-Place Editing** — `editPlan` and `editPRD` tools let the AI edit existing saved documents. The full updated markdown streams into the workspace-context `AiEditState`, and the detail view shows a live animated preview while locking out manual editing.
 

@@ -51,6 +51,21 @@ export function getRateLimitIdentifier(
   return forwarded?.split(",")[0]?.trim() ?? "anonymous";
 }
 
+// Wrap limiter calls so an unreachable/misconfigured Redis fails open
+// (allows the request through) instead of 500-ing every API call.
+export async function safeLimit(
+  limiter: Ratelimit | null,
+  id: string
+): Promise<{ success: boolean; reset: number }> {
+  if (!limiter) return { success: true, reset: 0 };
+  try {
+    return await limiter.limit(id);
+  } catch (err) {
+    console.warn("Rate limiter unreachable — failing open:", err);
+    return { success: true, reset: 0 };
+  }
+}
+
 export function rateLimitResponse(reset: number): Response {
   const retryAfter = Math.ceil((reset - Date.now()) / 1000);
   return new Response("Too Many Requests", {

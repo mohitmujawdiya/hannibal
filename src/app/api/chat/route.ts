@@ -13,7 +13,9 @@ import { artifactTools } from "@/server/ai/tools/generate-artifact";
 import { createReadArtifactTool, createReadAllArtifactsTool } from "@/server/ai/tools/read-artifact";
 import { createEditPlanTool, createEditPrdTool } from "@/server/ai/tools/edit-artifact";
 import { askFollowUpTool } from "@/server/ai/tools/ask-follow-up";
-import { chatLimiter, demoChatLimiter, getRateLimitIdentifier, rateLimitResponse } from "@/lib/rate-limit";
+import { askOpenQuestionTool } from "@/server/ai/tools/ask-open-question";
+import { proposeAndConfirmTool } from "@/server/ai/tools/propose-and-confirm";
+import { chatLimiter, demoChatLimiter, getRateLimitIdentifier, rateLimitResponse, safeLimit } from "@/lib/rate-limit";
 import { loadProjectArtifacts } from "@/server/services/project-context";
 
 const DEMO_USER_ID = process.env.DEMO_USER_ID;
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
   const limiter = isDemo ? (demoChatLimiter ?? chatLimiter) : chatLimiter;
   if (limiter) {
     const id = getRateLimitIdentifier(userId, req);
-    const { success, reset } = await limiter.limit(id);
+    const { success, reset } = await safeLimit(limiter, id);
     if (!success) return rateLimitResponse(reset);
   }
 
@@ -96,6 +98,8 @@ export async function POST(req: Request) {
     tools: {
       webSearch: webSearchTool,
       askFollowUp: askFollowUpTool,
+      askOpenQuestion: askOpenQuestionTool,
+      proposeAndConfirm: proposeAndConfirmTool,
       ...artifactTools,
       readArtifact: createReadArtifactTool(allArtifacts),
       readAllArtifacts: createReadAllArtifactsTool(allArtifacts),
