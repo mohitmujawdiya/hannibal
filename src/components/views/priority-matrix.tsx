@@ -579,9 +579,9 @@ export function PriorityMatrixView({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto px-4 py-5">
-        <div className="rounded-lg border border-border/50 overflow-hidden">
-        <table className="w-full text-sm table-auto">
+      <div className="flex-1 overflow-y-auto px-4 py-5">
+        <div className="rounded-lg border border-border/50 overflow-x-auto">
+        <table className="w-full min-w-[760px] text-sm table-auto">
           <thead className="sticky top-0 bg-muted/80 border-b border-border/50 z-10">
             <tr>
               <th className="text-left px-4 py-3.5 w-full">
