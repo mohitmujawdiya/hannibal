@@ -102,7 +102,7 @@ Every view must:
 
 ## AI Orchestration
 - Vercel AI SDK (`ai` package) for streaming and tool calling
-- OpenAI GPT-4o as primary model, Tavily API for web research
+- OpenAI GPT-5 family (default `gpt-5.4`, with `gpt-5.4-mini`, `gpt-5-pro`, `o3`, `gpt-4o`) selected by the model router; Tavily API for web research
 - Single chat endpoint (`src/app/api/chat/route.ts`) orchestrates all AI via `streamText`
 - System prompt built dynamically in `src/server/ai/prompts/system.ts` with view context + artifact state
 - Tool definitions in `src/server/ai/tools/` (generate-artifact, read-artifact, web-search, ask-follow-up, ask-open-question, propose-and-confirm, edit-artifact)
@@ -132,6 +132,18 @@ Both routes redirect authenticated users to `/`. `proxy.ts` sets the relevant co
 - Explicit choices override: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5-pro`, `o3`, `gpt-4o`.
 - `temperatureFor(model)` returns `undefined` for o-series (which constrain temperature) and `0.7` for everything else.
 - Model picker in `ai-panel.tsx` exposes the choices; default state is "auto".
+
+### Sync-Service Performance
+`feature.syncTree` and `roadmap.syncFull` write many rows in one transaction. They were rewritten to parallelize:
+- Updates run in parallel (`Promise.all`) — no inter-row dependencies.
+- Feature-tree creates run in waves: nodes whose parent is resolved go in a wave together, then the next wave once IDs are recorded — O(tree-depth) round-trips instead of O(node-count).
+- Roadmap items run in parallel after lanes finish (since items reference lane IDs from the lane creates).
+- Both transactions use a 10s timeout — comfortable for the post-parallel happy path (~1-2s) without papering over genuine runaway transactions.
+
+### Roadmap rendering
+Lane height auto-grows with `subrows.length`. Subrow assignment is in `groupItemsToSubrowsByVisualOverlap` (`src/lib/roadmap-utils.ts`):
+- **Bars** share subrows by time-span overlap (greedy first-fit).
+- **Milestones** each get their own subrow — their titles render past the diamond marker into adjacent items' space, and time-span overlap detection alone misses this.
 
 ### Follow-Up Engine (three asking tools)
 Clarification is handled by three human-in-the-loop tools, picked by the model based on question shape:

@@ -52,7 +52,7 @@ Three-panel workspace with AI context bridge:
 - [x] Three-panel workspace shell with resizable panels
 - [x] Project switcher dropdown (real DB, create/switch projects)
 - [x] Clean URLs with project slugs (`/my-project/plan`) and bidirectional view-URL sync
-- [x] AI chat panel with streaming (GPT-4o via Vercel AI SDK v6)
+- [x] AI chat panel with streaming (GPT-5 family via Vercel AI SDK v6); model router (`Auto` default) routes by intent — RICE/priorities → `o3`, "deep/thorough" → `gpt-5-pro`, "refine/edit" → `gpt-5.4-mini`, otherwise `gpt-5.4`
 - [x] Artifact generation + "Push to View" flow
 - [x] AI follow-up engine — three human-in-the-loop tools picked by question shape: `proposeAndConfirm` (default; AI commits to a defensible assumption, user picks Confirm/Refine/Replace), `askFollowUp` (1-4 batched constrained-option questions with multiSelect, header chips, "(Recommended)" first-position pattern), `askOpenQuestion` (prose answers for research/anecdotes/constraints). Problem-first prompt enforcement bans MBA-bucket framings ("VC-backed competitor", "What unique AI capability...") and requires question subjects to be the user, not the product.
 - [x] AI in-place editing (editPlan/editPRD tools stream updated content live into the detail view)
@@ -72,6 +72,9 @@ Three-panel workspace with AI context bridge:
 - [x] Hard delete with 10-second undo toasts for all artifacts and projects
 - [x] Manual artifact creation + AI-focused empty states ("Generate with AI" / "Start from Scratch" CTAs)
 - [x] Demo mode (`/demo` route — cookie-based auth fallback, pre-seeded project, no sign-up required, stricter rate limiting)
+- [x] Playground mode (`/playground` route — empty sandbox auto-created on first visit, separate cookie, normal rate limit; intended for evaluation links to a single recipient)
+- [x] Parallelized sync transactions — `feature.syncTree` and `roadmap.syncFull` rewrote serial loops as `Promise.all` batches (creates in waves for tree to honor parent→child deps); 10s tx timeout
+- [x] Defensive markdown rendering — section-card view auto-handles minor AI formatting drift in plan/PRD output
 
 ### Editor
 - [x] MarkdownDoc component (react-markdown view + textarea edit mode, replaced Novel/Tiptap)
