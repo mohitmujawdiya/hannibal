@@ -224,7 +224,7 @@ export async function syncFeatureTree(
       orderBy: { order: "asc" },
       include: buildChildrenInclude(5),
     });
-  }, { timeout: 30_000 });
+  }, { timeout: 10_000 });
 }
 
 function buildChildrenInclude(depth: number): object | undefined {

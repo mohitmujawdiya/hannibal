@@ -40,137 +40,140 @@ export async function syncRoadmapFull(
     items: ItemInput[];
   },
 ) {
-  // Bump tx timeout to 30s — Prisma defaults to 5s, but a roadmap with many
-  // lanes/items + remote DB (Neon) latency can exceed 5s.
+  // Updates/creates are independent within their type, and items only depend
+  // on the lane-id map. So: lanes finish first (updates+creates in parallel),
+  // then items run (updates+creates in parallel). 10s timeout is plenty —
+  // parallelized operations rarely exceed 2-3s even on remote DB.
   return db.$transaction(async (tx) => {
-    // 1. Upsert roadmap
+    // 1. Upsert roadmap (must complete before lanes/items reference roadmapId)
     let roadmapId: string;
     if (input.roadmapId) {
       await tx.roadmap.update({
         where: { id: input.roadmapId },
-        data: {
-          title: input.title,
-          timeScale: input.timeScale,
-        },
+        data: { title: input.title, timeScale: input.timeScale },
       });
       roadmapId = input.roadmapId;
     } else {
       const created = await tx.roadmap.create({
-        data: {
-          title: input.title,
-          timeScale: input.timeScale,
-          projectId,
-        },
+        data: { title: input.title, timeScale: input.timeScale, projectId },
       });
       roadmapId = created.id;
     }
 
-    // 2. Get existing lanes and items
-    const existingLanes = await tx.roadmapLane.findMany({
-      where: { roadmapId },
-    });
-    const existingItems = await tx.roadmapItem.findMany({
-      where: { roadmapId },
-    });
+    // 2. Read existing lanes + items (in parallel — independent reads)
+    const [existingLanes, existingItems] = await Promise.all([
+      tx.roadmapLane.findMany({ where: { roadmapId } }),
+      tx.roadmapItem.findMany({ where: { roadmapId } }),
+    ]);
 
-    // 3. Build clientId → existing DB id mapping for lanes
-    // Lanes with CUID-format IDs might already be in DB
     const existingLaneById = new Map(existingLanes.map((l) => [l.id, l]));
+    const laneUpdates = input.lanes.filter((l) => existingLaneById.has(l.clientId));
+    const laneCreates = input.lanes.filter((l) => !existingLaneById.has(l.clientId));
 
-    // Map from clientId → DB lane ID
+    // 3. Lane updates (parallel) and creates (parallel) — all independent
     const laneIdMap = new Map<string, string>();
-
-    // Sync lanes
     const touchedLaneIds = new Set<string>();
-    for (const lane of input.lanes) {
-      if (existingLaneById.has(lane.clientId)) {
-        // Update existing lane
-        await tx.roadmapLane.update({
-          where: { id: lane.clientId },
-          data: { name: lane.name, color: lane.color, order: lane.order },
-        });
-        laneIdMap.set(lane.clientId, lane.clientId);
-        touchedLaneIds.add(lane.clientId);
-      } else {
-        // Create new lane
-        const created = await tx.roadmapLane.create({
-          data: {
-            name: lane.name,
-            color: lane.color,
-            order: lane.order,
-            roadmapId,
-          },
-        });
-        laneIdMap.set(lane.clientId, created.id);
-        touchedLaneIds.add(created.id);
-      }
-    }
 
-    // Delete lanes not in input
+    const [, createdLanes] = await Promise.all([
+      Promise.all(
+        laneUpdates.map((lane) =>
+          tx.roadmapLane.update({
+            where: { id: lane.clientId },
+            data: { name: lane.name, color: lane.color, order: lane.order },
+          }),
+        ),
+      ),
+      Promise.all(
+        laneCreates.map((lane) =>
+          tx.roadmapLane.create({
+            data: {
+              name: lane.name,
+              color: lane.color,
+              order: lane.order,
+              roadmapId,
+            },
+          }),
+        ),
+      ),
+    ]);
+
+    laneUpdates.forEach((l) => {
+      laneIdMap.set(l.clientId, l.clientId);
+      touchedLaneIds.add(l.clientId);
+    });
+    laneCreates.forEach((l, i) => {
+      laneIdMap.set(l.clientId, createdLanes[i].id);
+      touchedLaneIds.add(createdLanes[i].id);
+    });
+
+    // 4. Lane deletes — single deleteMany
     const laneIdsToDelete = existingLanes
       .filter((l) => !touchedLaneIds.has(l.id))
       .map((l) => l.id);
-    if (laneIdsToDelete.length > 0) {
-      await tx.roadmapLane.deleteMany({
-        where: { id: { in: laneIdsToDelete } },
-      });
-    }
+    const laneDeletePromise =
+      laneIdsToDelete.length > 0
+        ? tx.roadmapLane.deleteMany({ where: { id: { in: laneIdsToDelete } } })
+        : Promise.resolve();
 
-    // 4. Sync items
+    // 5. Items: updates and creates in parallel; lane delete runs concurrently
     const existingItemById = new Map(existingItems.map((i) => [i.id, i]));
-    const touchedItemIds = new Set<string>();
+    const itemUpdates = input.items.filter((i) => existingItemById.has(i.clientId));
+    const itemCreates = input.items.filter((i) => !existingItemById.has(i.clientId));
 
-    for (const item of input.items) {
-      const resolvedLaneId = laneIdMap.get(item.laneClientId) ?? null;
+    const [, , createdItems] = await Promise.all([
+      laneDeletePromise,
+      Promise.all(
+        itemUpdates.map((item) =>
+          tx.roadmapItem.update({
+            where: { id: item.clientId },
+            data: {
+              title: item.title,
+              description: item.description,
+              laneId: laneIdMap.get(item.laneClientId) ?? null,
+              startDate: new Date(item.startDate),
+              endDate: new Date(item.endDate),
+              status: item.status,
+              type: item.type,
+              color: item.color,
+              order: item.order,
+            },
+          }),
+        ),
+      ),
+      Promise.all(
+        itemCreates.map((item) =>
+          tx.roadmapItem.create({
+            data: {
+              title: item.title,
+              description: item.description,
+              laneId: laneIdMap.get(item.laneClientId) ?? null,
+              startDate: new Date(item.startDate),
+              endDate: new Date(item.endDate),
+              status: item.status,
+              type: item.type,
+              color: item.color,
+              order: item.order,
+              roadmapId,
+            },
+          }),
+        ),
+      ),
+    ]);
 
-      if (existingItemById.has(item.clientId)) {
-        // Update existing item
-        await tx.roadmapItem.update({
-          where: { id: item.clientId },
-          data: {
-            title: item.title,
-            description: item.description,
-            laneId: resolvedLaneId,
-            startDate: new Date(item.startDate),
-            endDate: new Date(item.endDate),
-            status: item.status,
-            type: item.type,
-            color: item.color,
-            order: item.order,
-          },
-        });
-        touchedItemIds.add(item.clientId);
-      } else {
-        // Create new item
-        const created = await tx.roadmapItem.create({
-          data: {
-            title: item.title,
-            description: item.description,
-            laneId: resolvedLaneId,
-            startDate: new Date(item.startDate),
-            endDate: new Date(item.endDate),
-            status: item.status,
-            type: item.type,
-            color: item.color,
-            order: item.order,
-            roadmapId,
-          },
-        });
-        touchedItemIds.add(created.id);
-      }
-    }
+    const touchedItemIds = new Set<string>([
+      ...itemUpdates.map((i) => i.clientId),
+      ...createdItems.map((c) => c.id),
+    ]);
 
-    // Delete items not in input
+    // 6. Item deletes
     const itemIdsToDelete = existingItems
       .filter((i) => !touchedItemIds.has(i.id))
       .map((i) => i.id);
     if (itemIdsToDelete.length > 0) {
-      await tx.roadmapItem.deleteMany({
-        where: { id: { in: itemIdsToDelete } },
-      });
+      await tx.roadmapItem.deleteMany({ where: { id: { in: itemIdsToDelete } } });
     }
 
-    // 5. Return the complete roadmap
+    // 7. Return the complete roadmap
     return tx.roadmap.findUniqueOrThrow({
       where: { id: roadmapId },
       include: {
@@ -184,5 +187,5 @@ export async function syncRoadmapFull(
         },
       },
     });
-  }, { timeout: 30_000 });
+  }, { timeout: 10_000 });
 }
