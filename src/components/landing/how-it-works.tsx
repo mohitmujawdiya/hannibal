@@ -5,21 +5,21 @@ import { motion } from "motion/react";
 const steps = [
   {
     number: "01",
-    title: "Describe your idea",
+    title: "Bring a rough idea",
     description:
-      "Tell the AI about your idea, market, and goals — even if it's just a rough concept.",
+      "One sentence is enough. Vague, half-baked, or fully formed — the AI starts from whatever you give it.",
   },
   {
     number: "02",
-    title: "AI generates everything",
+    title: "AI interviews you, then writes",
     description:
-      "Plans, PRDs, feature trees, personas, and competitive analysis — all at once.",
+      "Hannibal asks the questions other planners skip — who's in pain, what's broken about the alternative. Then drafts the plan, PRD, personas, and roadmap with you.",
   },
   {
     number: "03",
-    title: "Iterate & launch",
+    title: "Iterate in the workspace",
     description:
-      "Edit, reorganize, and refine in the workspace. Push to your roadmap when ready.",
+      "Edit in-place, score with RICE, drag the roadmap. Saved artifacts feed the AI's context, so each new draft gets sharper.",
   },
 ] as const;
 
