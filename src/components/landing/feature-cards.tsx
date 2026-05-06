@@ -1,39 +1,51 @@
 "use client";
 
 import { motion } from "motion/react";
-import { FileText, GitBranch, Map, Users, Swords } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  Users,
+  Swords,
+  FileText,
+  GitBranch,
+  BarChart3,
+  Map,
+} from "lucide-react";
 
 const features = [
-  {
-    icon: FileText,
-    title: "AI Plans & PRDs",
-    description:
-      "Turn a rough idea into a structured plan and detailed spec in seconds.",
-  },
-  {
-    icon: GitBranch,
-    title: "Feature Trees",
-    description:
-      "Break down your vision into an interactive feature hierarchy. AI fills in what you miss.",
-  },
-  {
-    icon: Map,
-    title: "Roadmaps",
-    description:
-      "Drag-and-drop timeline roadmaps that stay in sync with your feature tree.",
-  },
   {
     icon: Users,
     title: "Personas",
     description:
-      "Know your users before you build. AI creates personas grounded in your market.",
+      "Real users with goals, frustrations, and switching costs — not stock demographics. AI grounds them in your wedge.",
   },
   {
     icon: Swords,
     title: "Competitor Analysis",
     description:
-      "Research competitors with AI-powered web search and structured breakdowns.",
+      "Live web research finds positioning, structural weaknesses, and feature gaps mapped to where you can win.",
+  },
+  {
+    icon: FileText,
+    title: "Plans & PRDs",
+    description:
+      "Tell the AI what you're building. It interviews you, drafts the plan or PRD, and streams edits in-place when you refine.",
+  },
+  {
+    icon: GitBranch,
+    title: "Feature Tree",
+    description:
+      "Map the product as a hierarchy. AI suggests the children you missed and refines descriptions on demand.",
+  },
+  {
+    icon: BarChart3,
+    title: "RICE Priorities",
+    description:
+      "Score features with reach × impact × confidence ÷ effort. AI proposes scores with rationale grounded in your roadmap.",
+  },
+  {
+    icon: Map,
+    title: "Roadmap",
+    description:
+      "Drag bars across quarters. Swim lanes, milestones, and dependencies stay in sync with the feature tree.",
   },
 ] as const;
 
@@ -50,8 +62,8 @@ export function FeatureCards() {
           transition={{ duration: 0.6, ease }}
           className="mb-12 text-center text-2xl font-semibold sm:text-3xl"
         >
-          Everything you need from idea to launch.{" "}
-          <span className="text-muted-foreground">AI does the heavy lifting.</span>
+          From idea to shipped roadmap.{" "}
+          <span className="text-muted-foreground">AI asks, writes, and prioritizes.</span>
         </motion.h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, i) => (
@@ -62,16 +74,11 @@ export function FeatureCards() {
               viewport={{ once: true, margin: "-50px" }}
               transition={{
                 duration: 0.5,
-                delay: i * 0.1,
+                delay: i * 0.08,
                 ease,
               }}
               whileHover={{ y: -2 }}
-              className={cn(
-                "group rounded-xl border border-border/50 bg-card/50 p-6 transition-colors hover:border-border",
-                // Center the last 2 cards in a 3-col grid
-                i === 3 && "lg:col-start-1 lg:col-end-2 lg:justify-self-end",
-                i === 4 && "lg:col-start-2 lg:col-end-3"
-              )}
+              className="group rounded-xl border border-border/50 bg-card/50 p-6 transition-colors hover:border-border"
             >
               <feature.icon className="mb-3 h-5 w-5 text-muted-foreground transition-colors group-hover:text-blue-400" />
               <h3 className="mb-1 text-sm font-semibold">{feature.title}</h3>
