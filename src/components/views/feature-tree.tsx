@@ -35,6 +35,7 @@ import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectFeatureTree } from "@/hooks/use-project-data";
 import { trpc } from "@/lib/trpc";
 import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
+import { useUndoRedo } from "@/hooks/use-undo-redo";
 import { featureTreeToMarkdown } from "@/lib/artifact-to-markdown";
 import type { FeatureNode, FeatureTreeArtifact } from "@/lib/artifact-types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -104,44 +105,7 @@ function updateNodeAtPath(
   );
 }
 
-function useUndoRedo<T>(maxHistory = 50) {
-  const undoStack = useRef<T[]>([]);
-  const redoStack = useRef<T[]>([]);
-  const [revision, setRevision] = useState(0);
-
-  const pushUndo = useCallback(
-    (snapshot: T) => {
-      undoStack.current = [...undoStack.current.slice(-(maxHistory - 1)), snapshot];
-      redoStack.current = [];
-      setRevision((r) => r + 1);
-    },
-    [maxHistory],
-  );
-
-  const undo = useCallback((current: T): T | null => {
-    if (undoStack.current.length === 0) return null;
-    const prev = undoStack.current.pop()!;
-    redoStack.current.push(current);
-    setRevision((r) => r + 1);
-    return prev;
-  }, []);
-
-  const redo = useCallback((current: T): T | null => {
-    if (redoStack.current.length === 0) return null;
-    const next = redoStack.current.pop()!;
-    undoStack.current.push(current);
-    setRevision((r) => r + 1);
-    return next;
-  }, []);
-
-  const canUndo = undoStack.current.length > 0;
-  const canRedo = redoStack.current.length > 0;
-
-  // revision is read to ensure re-render when stacks change
-  void revision;
-
-  return { pushUndo, undo, redo, canUndo, canRedo };
-}
+// useUndoRedo extracted to @/hooks/use-undo-redo for reuse with the roadmap.
 
 function FeatureTreeContent({ projectId }: { projectId: string }) {
   const { tree: dbTree, isLoading, syncTree, removeAll } = useProjectFeatureTree(projectId);

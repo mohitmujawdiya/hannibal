@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useProjectRoadmap } from "@/hooks/use-project-data";
 import { useDebouncedMutation } from "@/hooks/use-debounced-mutation";
+import { useUndoRedo } from "@/hooks/use-undo-redo";
+import type { RoadmapLane } from "@/lib/artifact-types";
 import { artifactToSyncInput } from "@/lib/transforms/roadmap";
 import { roadmapToMarkdown } from "@/lib/artifact-to-markdown";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -85,16 +87,67 @@ export function RoadmapView({ projectId }: { projectId: string }) {
   );
   const { debouncedFn: debouncedSync } = useDebouncedMutation(syncAsync, 300);
 
+  // Undo/redo for roadmap edits — snapshots the editable parts (lanes + items).
+  type RoadmapSnapshot = { lanes: RoadmapLane[]; items: RoadmapItem[] };
+  const { pushUndo, undo, redo, canUndo, canRedo } = useUndoRedo<RoadmapSnapshot>();
+
+  // Internal apply without pushing undo (used by undo/redo themselves so they
+  // don't pollute the stack).
+  const applyWithoutUndo = useCallback(
+    (partial: Partial<RoadmapArtifact>) => {
+      const cur = roadmapRef.current;
+      if (!cur) return;
+      const merged: RoadmapArtifact & { id: string } = { ...cur, ...partial };
+      hasPendingEdits.current = true;
+      setLocalRoadmap(merged);
+      debouncedSync(merged);
+    },
+    [debouncedSync],
+  );
+
   const handleUpdate = useCallback(
     (partial: Partial<RoadmapArtifact>) => {
       if (!roadmap) return;
+      pushUndo({ lanes: roadmap.lanes, items: roadmap.items });
       const merged: RoadmapArtifact & { id: string } = { ...roadmap, ...partial };
       hasPendingEdits.current = true;
       setLocalRoadmap(merged);
       debouncedSync(merged);
     },
-    [roadmap, debouncedSync],
+    [roadmap, debouncedSync, pushUndo],
   );
+
+  const handleUndo = useCallback(() => {
+    const cur = roadmapRef.current;
+    if (!cur) return;
+    const prev = undo({ lanes: cur.lanes, items: cur.items });
+    if (prev) applyWithoutUndo(prev);
+  }, [undo, applyWithoutUndo]);
+
+  const handleRedo = useCallback(() => {
+    const cur = roadmapRef.current;
+    if (!cur) return;
+    const next = redo({ lanes: cur.lanes, items: cur.items });
+    if (next) applyWithoutUndo(next);
+  }, [redo, applyWithoutUndo]);
+
+  // Keyboard shortcuts: Cmd/Ctrl+Z = undo, Cmd/Ctrl+Shift+Z = redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (mod && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleUndo, handleRedo]);
 
   const handleTimeScaleChange = useCallback(
     (timeScale: RoadmapTimeScale) => {
@@ -265,6 +318,10 @@ export function RoadmapView({ projectId }: { projectId: string }) {
         onImportFeatures={() => setImportDialogOpen(true)}
         onDelete={() => remove(roadmap.id)}
         getMarkdown={getMarkdown}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
 
       <div className="flex-1 min-h-0 overflow-auto px-4 py-5">
