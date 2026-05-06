@@ -17,6 +17,11 @@ async function handler(req: Request) {
     req,
     router: appRouter,
     createContext,
+    onError: ({ path, error }) => {
+      console.error(`[tRPC error] ${path}:`, error);
+      if (error.cause) console.error("  cause:", error.cause);
+      if (error.stack) console.error("  stack:", error.stack);
+    },
   });
 }
 

@@ -82,6 +82,8 @@ export function AiPanel({ projectId }: AiPanelProps) {
   const [input, setInput] = useState("");
   const [model, setModel] = useState("auto");
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
   useEffect(() => {
     if (focusAiInput > 0) {
@@ -288,25 +290,26 @@ export function AiPanel({ projectId }: AiPanelProps) {
           <span className="text-base font-semibold">Hannibal AI</span>
         </div>
         <div className="flex items-center gap-1">
-          <AlertDialog>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem
-                    className="text-xs text-destructive focus:text-destructive"
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-2" />
-                    Clear chat
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <DropdownMenu open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-xs text-destructive focus:text-destructive"
+                onSelect={() => {
+                  setMoreMenuOpen(false);
+                  setClearDialogOpen(true);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                Clear chat
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Clear chat history?</AlertDialogTitle>

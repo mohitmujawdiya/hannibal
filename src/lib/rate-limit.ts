@@ -25,11 +25,15 @@ export const chatLimiter = redis
     })
   : null;
 
-// Stricter rate limit for demo users: 10 messages per hour
+// Demo: 30 messages per hour. Stricter than authenticated users (which get the
+// chatLimiter at 20/min) but generous enough that an evaluator can actually
+// explore — generating a plan, PRD, personas, competitors, features, RICE,
+// roadmap takes ~7 calls. /playground uses the normal chatLimiter (no extra
+// limit) since that's the "build something with your own idea" path.
 export const demoChatLimiter = redis
   ? new Ratelimit({
       redis,
-      limiter: Ratelimit.slidingWindow(10, "1 h"),
+      limiter: Ratelimit.slidingWindow(30, "1 h"),
       prefix: "rl:demo-chat",
     })
   : null;

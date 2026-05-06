@@ -138,7 +138,10 @@ export async function syncFeatureTree(
     walkNode(child, null, i, null);
   });
 
-  // 4. Execute in transaction
+  // 4. Execute in transaction. Default Prisma timeout is 5000ms; bump to 30s
+  // because we serialize tx.feature.create() per-node to capture IDs for child
+  // parent links, and a deeply-nested tree + remote DB (Neon) latency can blow
+  // past 5s easily. 30s is a safe ceiling for an interactive save.
   return db.$transaction(async (tx) => {
     // Update existing features
     for (const update of updates) {
@@ -198,7 +201,7 @@ export async function syncFeatureTree(
       orderBy: { order: "asc" },
       include: buildChildrenInclude(5),
     });
-  });
+  }, { timeout: 30_000 });
 }
 
 function buildChildrenInclude(depth: number): object | undefined {

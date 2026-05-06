@@ -10,7 +10,6 @@ import {
   BarChart3,
   Users,
   Swords,
-  Search,
   Settings,
   PanelLeftClose,
   LogIn,
@@ -36,7 +35,7 @@ type SidebarProps = {
 const viewItems: { id: ViewType; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "plan", label: "Plan", icon: FileText },
-  { id: "research", label: "Research", icon: Search },
+  // Research view is a placeholder — hidden until built
   { id: "competitors", label: "Competitors", icon: Swords },
   { id: "personas", label: "Personas", icon: Users },
   { id: "prd", label: "PRD", icon: ClipboardList },

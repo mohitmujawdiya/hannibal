@@ -40,6 +40,8 @@ export async function syncRoadmapFull(
     items: ItemInput[];
   },
 ) {
+  // Bump tx timeout to 30s — Prisma defaults to 5s, but a roadmap with many
+  // lanes/items + remote DB (Neon) latency can exceed 5s.
   return db.$transaction(async (tx) => {
     // 1. Upsert roadmap
     let roadmapId: string;
@@ -182,5 +184,5 @@ export async function syncRoadmapFull(
         },
       },
     });
-  });
+  }, { timeout: 30_000 });
 }

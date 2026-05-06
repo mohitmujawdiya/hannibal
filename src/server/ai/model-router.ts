@@ -68,12 +68,13 @@ export function routeModel(
   return DEFAULT_MODEL;
 }
 
-// Some models don't accept the standard temperature parameter (o-series reasoning
-// models constrain it). This helper returns the right temperature or undefined to
-// let the SDK fall through to the model default.
+// Some models don't accept the standard temperature parameter. The o-series
+// reasoning models reject it, and the GPT-5 family is also reasoning-based and
+// rejects it. Only legacy GPT-4 / GPT-4o accept temperature.
 export function temperatureFor(
   model: Exclude<AllowedModel, "auto">,
 ): number | undefined {
   if (model.startsWith("o")) return undefined; // o3, o4-mini, etc.
+  if (model.startsWith("gpt-5")) return undefined; // gpt-5, gpt-5.4, gpt-5-pro, etc.
   return 0.7;
 }
