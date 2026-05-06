@@ -1188,6 +1188,11 @@ function MessageMarkdown({ content }: { content: string }) {
             </a>
           );
         },
+        table: ({ children, ...props }) => (
+          <div className="my-2 overflow-x-auto">
+            <table {...props}>{children}</table>
+          </div>
+        ),
       }}
     >
       {content}

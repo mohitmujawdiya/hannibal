@@ -387,7 +387,17 @@ function SectionCardLayout({ content }: { content: string }) {
           </CardHeader>
           <CardContent>
             <div className={`prose prose-sm dark:prose-invert max-w-none text-sm text-foreground [&_p]:mb-2 [&_ul]:mb-2 [&_ol]:mb-2 [&_li]:mb-0.5 [&_ul]:pl-3 [&_ol]:pl-3 ${section.color} [&_li]:marker:text-current [&_p]:text-foreground [&_li]:text-foreground`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeSanitize]}
+                components={{
+                  table: ({ children, ...props }) => (
+                    <div className="my-2 overflow-x-auto">
+                      <table {...props}>{children}</table>
+                    </div>
+                  ),
+                }}
+              >
                 {section.body}
               </ReactMarkdown>
             </div>

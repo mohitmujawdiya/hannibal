@@ -131,7 +131,19 @@ export function MarkdownDoc({
         )}
       >
         {value.trim() ? (
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{value}</ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeSanitize]}
+            components={{
+              table: ({ children, ...props }) => (
+                <div className="my-2 overflow-x-auto">
+                  <table {...props}>{children}</table>
+                </div>
+              ),
+            }}
+          >
+            {value}
+          </ReactMarkdown>
         ) : (
           <p className="text-muted-foreground">{placeholder}</p>
         )}
