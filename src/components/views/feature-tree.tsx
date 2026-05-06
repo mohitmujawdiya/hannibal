@@ -509,7 +509,7 @@ function FeatureTreeContent({ projectId }: { projectId: string }) {
             <MiniMap pannable zoomable />
           </ReactFlow>
         ) : (
-          <div className="overflow-auto p-6">
+          <div className="h-full overflow-auto p-6">
             <div className="max-w-3xl mx-auto">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 px-3 py-2">
