@@ -87,13 +87,19 @@ export function groupItemsToSubrowsByVisualOverlap(
   range: DndRange,
 ): Record<string, TimelineItemDef[][]> {
   const rangeSpan = range.end - range.start;
-  // ~12% of visible range per milestone title — empirically about the width of
-  // the truncated max-w-[200px] title at typical font size and zoom levels.
-  const milestoneTitleBuffer = rangeSpan * 0.12;
+  // Estimate the milestone title's pixel width in "time-equivalent" units.
+  // text-sm is ~7px/char. Assume the timeline area is ~1200px wide for the
+  // visible range (true within a factor of ~1.5x for typical workspace
+  // layouts). Add 24px for the diamond marker and gap. We err on the side of
+  // extra stacking — the cost is one extra subrow, the benefit is no
+  // collision when zoomed out or with long titles.
+  const ASSUMED_TIMELINE_PX = 1200;
+  const titleBufferFor = (title: string) =>
+    ((title.length * 7 + 24) / ASSUMED_TIMELINE_PX) * rangeSpan;
 
   const visualEnd = (def: TimelineItemDef): number => {
     if (def.roadmapItem.type === "milestone") {
-      return def.span.start + milestoneTitleBuffer;
+      return def.span.start + titleBufferFor(def.roadmapItem.title);
     }
     return def.span.end;
   };
