@@ -17,6 +17,7 @@ import { askOpenQuestionTool } from "@/server/ai/tools/ask-open-question";
 import { proposeAndConfirmTool } from "@/server/ai/tools/propose-and-confirm";
 import { chatLimiter, demoChatLimiter, getRateLimitIdentifier, rateLimitResponse, safeLimit } from "@/lib/rate-limit";
 import { loadProjectArtifacts } from "@/server/services/project-context";
+import { routeModel, temperatureFor } from "@/server/ai/model-router";
 
 const DEMO_USER_ID = process.env.DEMO_USER_ID;
 
@@ -63,8 +64,22 @@ export async function POST(req: Request) {
     model: requestedModel,
   } = body;
 
-  const ALLOWED_MODELS = ["gpt-4o", "gpt-4o-mini", "o3-mini"];
-  const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "gpt-4o";
+  // Route the model: explicit choice wins; "auto" (or unrecognized) → rule-based pick
+  // based on active view + last user message intent (priorities/RICE → o3, quick edits
+  // → gpt-5.4-mini, "deep/thorough" → gpt-5-pro, default → gpt-5.4).
+  const lastUserMessage =
+    [...(rawMessages as UIMessage[])].reverse().find((m) => m.role === "user") ??
+    null;
+  const lastUserText = lastUserMessage
+    ? lastUserMessage.parts
+        .filter((p): p is { type: "text"; text: string } => p.type === "text")
+        .map((p) => p.text)
+        .join(" ")
+    : "";
+  const model = routeModel(requestedModel, {
+    activeView,
+    messageText: lastUserText,
+  });
 
   // Load saved project artifacts from DB to give AI persistent context
   let dbArtifacts: Awaited<ReturnType<typeof loadProjectArtifacts>> = [];
@@ -107,7 +122,7 @@ export async function POST(req: Request) {
       editPRD: createEditPrdTool(userId),
     },
     stopWhen: stepCountIs(5),
-    temperature: 0.7,
+    temperature: temperatureFor(model),
     maxOutputTokens: 16384,
   });
 

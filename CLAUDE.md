@@ -119,6 +119,13 @@ The system prompt includes artifact state tiered by relevance to the active view
 ### Expert Prompt Pattern
 Tool descriptions use expert personas with per-section quality criteria rather than format-only instructions. Section headings are framed as "typical sections (include all that apply, skip or add as context demands)" so the AI can adapt structure to context.
 
+### Model Router (Auto by default)
+`src/server/ai/model-router.ts` picks the OpenAI model per request:
+- "Auto" (default) routes by intent: priorities/RICE keywords or active view → `o3` (reasoning); "deep/thorough/comprehensive" → `gpt-5-pro`; "refine/edit/tweak" → `gpt-5.4-mini`; otherwise `gpt-5.4`.
+- Explicit choices override: `gpt-5.4`, `gpt-5.4-mini`, `gpt-5-pro`, `o3`, `gpt-4o`.
+- `temperatureFor(model)` returns `undefined` for o-series (which constrain temperature) and `0.7` for everything else.
+- Model picker in `ai-panel.tsx` exposes the choices; default state is "auto".
+
 ### Follow-Up Engine (three asking tools)
 Clarification is handled by three human-in-the-loop tools, picked by the model based on question shape:
 - **`proposeAndConfirm`** (default when context allows a defensible guess): AI commits to an assumption with reasoning + 2-4 implications; user clicks Confirm / Refine / Replace. Most respectful of user time — shows the AI listened. Renderer: `src/components/ai/propose-confirm-card.tsx`.

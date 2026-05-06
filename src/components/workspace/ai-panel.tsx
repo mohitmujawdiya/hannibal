@@ -60,9 +60,12 @@ type AiPanelProps = {
 };
 
 const MODEL_OPTIONS = [
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gpt-4o-mini", label: "GPT-4o Mini" },
-  { id: "o3-mini", label: "o3 Mini" },
+  { id: "auto", label: "Auto" },
+  { id: "gpt-5.4", label: "GPT-5.4" },
+  { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+  { id: "gpt-5-pro", label: "GPT-5 Pro" },
+  { id: "o3", label: "o3 (reasoning)" },
+  { id: "gpt-4o", label: "GPT-4o (legacy)" },
 ] as const;
 
 const WELCOME_MESSAGE = "Hey! I'm Hannibal, your AI product co-pilot. Describe a problem you're trying to solve, and I'll help you research it, plan it, and build it.\n\nTry something like:\n- \"I want to build a fitness tracking app\"\n- \"Help me analyze the competitor landscape for task management tools\"\n- \"Generate user personas for an e-commerce platform\"";
@@ -77,7 +80,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isAtBottom = useRef(true);
   const [input, setInput] = useState("");
-  const [model, setModel] = useState("gpt-4o");
+  const [model, setModel] = useState("auto");
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   useEffect(() => {
@@ -456,7 +459,7 @@ export function AiPanel({ projectId }: AiPanelProps) {
                 type="button"
                 className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1 py-0.5 rounded"
               >
-                {MODEL_OPTIONS.find((m) => m.id === model)?.label ?? "GPT-4o"}
+                {MODEL_OPTIONS.find((m) => m.id === model)?.label ?? "Auto"}
                 <ChevronDown className="h-3 w-3" />
               </button>
             </DropdownMenuTrigger>
