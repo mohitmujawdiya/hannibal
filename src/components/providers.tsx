@@ -14,7 +14,22 @@ function getBaseUrl() {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  // Default staleTime is 0 — every component mount triggers a refetch even
+  // when the cached data is fresh. With remote DB latency that means each view
+  // switch shows a flash of empty/loading state. 30s staleTime keeps the cache
+  // warm across view switches without making mutations slow to reflect (those
+  // explicitly invalidate via utils.<x>.invalidate).
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 30_000,
+            refetchOnWindowFocus: false,
+          },
+        },
+      }),
+  );
   const [trpcClient] = useState(() =>
     trpc.createClient({
       links: [

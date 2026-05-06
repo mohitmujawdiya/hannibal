@@ -40,11 +40,11 @@ export function RoadmapToolbar({
       <h2 className="text-base font-semibold truncate">{title}</h2>
 
       <div className="flex items-center gap-2">
-        <div className="flex items-center">
+        <div className="flex items-center rounded-md border border-border overflow-hidden">
           <Button
             variant="ghost"
-            size="icon"
-            className="h-8 w-8"
+            size="sm"
+            className="h-8 px-2 rounded-none"
             onClick={onUndo}
             disabled={!canUndo}
             title="Undo (⌘Z)"
@@ -53,8 +53,8 @@ export function RoadmapToolbar({
           </Button>
           <Button
             variant="ghost"
-            size="icon"
-            className="h-8 w-8"
+            size="sm"
+            className="h-8 px-2 rounded-none"
             onClick={onRedo}
             disabled={!canRedo}
             title="Redo (⌘⇧Z)"

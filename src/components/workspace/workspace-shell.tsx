@@ -15,6 +15,7 @@ import { AiPanel } from "./ai-panel";
 import { WorkspaceSkeleton } from "./workspace-skeleton";
 import { useWorkspaceContext } from "@/stores/workspace-context";
 import { useViewUrlSync } from "@/hooks/use-view-url-sync";
+import { trpc } from "@/lib/trpc";
 
 type WorkspaceShellProps = {
   projectId: string;
@@ -39,6 +40,17 @@ export function WorkspaceShell({
   const toggleAiPanel = useWorkspaceContext((s) => s.toggleAiPanel);
 
   useViewUrlSync(projectSlug);
+
+  // Prefetch all artifact lists on project mount so the cache is warm
+  // regardless of which view the user lands on. With staleTime=30s in
+  // providers.tsx, view switches read from cache instead of refetching.
+  // tRPC's httpBatchLink coalesces these into a single HTTP request.
+  trpc.plan.list.useQuery({ projectId });
+  trpc.prd.list.useQuery({ projectId });
+  trpc.persona.list.useQuery({ projectId });
+  trpc.competitor.list.useQuery({ projectId });
+  trpc.feature.tree.useQuery({ projectId });
+  trpc.roadmap.list.useQuery({ projectId });
 
   useEffect(() => {
     setMounted(true);
