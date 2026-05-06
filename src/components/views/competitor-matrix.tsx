@@ -21,7 +21,6 @@ import {
   Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -225,11 +224,9 @@ export function CompetitorMatrixView({ projectId }: { projectId: string }) {
                       </p>
                     )}
                     {parsed.pricing && (
-                      <div>
-                        <Badge variant="outline" className="text-[10px]" title={parsed.pricing}>
-                          <DollarSign className="h-3 w-3 mr-0.5 shrink-0" />
-                          <span className="truncate max-w-[250px]">{parsed.pricing}</span>
-                        </Badge>
+                      <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <DollarSign className="h-3 w-3 mt-0.5 shrink-0 text-amber-400" />
+                        <p className="leading-relaxed">{parsed.pricing}</p>
                       </div>
                     )}
                   </CardHeader>
