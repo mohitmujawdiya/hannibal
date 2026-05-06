@@ -82,20 +82,39 @@ export function spanToDateStrings(span: Span): { startDate: string; endDate: str
  * Bars use their actual span (their title is constrained by the bar width
  * via `truncate`, so they don't bleed visually).
  */
+// Measure rendered pixel width of milestone titles using a shared canvas.
+// Variable-width fonts make character-count estimates wildly off (M is
+// ~13px, i is ~3px at text-sm), so we measure the actual string. Falls back
+// to a 9px/char estimate during SSR / when canvas is unavailable.
+let _measureCtx: CanvasRenderingContext2D | null | undefined;
+function measureTitlePx(title: string): number {
+  if (typeof document === "undefined") return title.length * 9;
+  if (_measureCtx === undefined) {
+    const c = document.createElement("canvas").getContext("2d");
+    if (c) {
+      // Match the milestone title's CSS: text-sm font-medium → 14px/500 weight,
+      // Geist Sans (via the app's font stack).
+      c.font =
+        '500 14px var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    }
+    _measureCtx = c;
+  }
+  if (!_measureCtx) return title.length * 9;
+  return _measureCtx.measureText(title).width;
+}
+
 export function groupItemsToSubrowsByVisualOverlap(
   items: TimelineItemDef[],
   range: DndRange,
 ): Record<string, TimelineItemDef[][]> {
   const rangeSpan = range.end - range.start;
-  // Estimate the milestone title's pixel width in "time-equivalent" units.
-  // text-sm is ~7px/char. Assume the timeline area is ~1200px wide for the
-  // visible range (true within a factor of ~1.5x for typical workspace
-  // layouts). Add 24px for the diamond marker and gap. We err on the side of
-  // extra stacking — the cost is one extra subrow, the benefit is no
-  // collision when zoomed out or with long titles.
+  // Convert measured title width (px) to time-equivalent buffer. Assume the
+  // timeline area is ~1200px wide for the visible range; we err high on
+  // stacking (cheap, just an extra subrow) over collision (expensive in
+  // readability). Add 28px for the diamond marker + gap.
   const ASSUMED_TIMELINE_PX = 1200;
   const titleBufferFor = (title: string) =>
-    ((title.length * 7 + 24) / ASSUMED_TIMELINE_PX) * rangeSpan;
+    ((measureTitlePx(title) + 28) / ASSUMED_TIMELINE_PX) * rangeSpan;
 
   const visualEnd = (def: TimelineItemDef): number => {
     if (def.roadmapItem.type === "milestone") {
