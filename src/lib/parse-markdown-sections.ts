@@ -79,6 +79,21 @@ function normalizeSectionMarkers(content: string): string {
   const bareLine = new RegExp(`^(${escaped})\\s*[:—–-]?\\s*$`, "gim");
   out = out.replace(bareLine, (_, name: string) => `## ${name.trim()}`);
 
+  // 3. Known section name at the start of a paragraph followed by content on
+  //    the same line — happens when the AI smushes the heading into the body
+  //    text: "Problem Statement Product and engineering leads..." Only fires
+  //    after a blank line or at start-of-doc, so mid-paragraph mentions of
+  //    "Problem Statement" don't false-match.
+  const inlineHeading = new RegExp(
+    `(^|\\n\\n)(${escaped})[ \\t]+(?=\\S)([^\\n]*)`,
+    "gi",
+  );
+  out = out.replace(
+    inlineHeading,
+    (_, prefix: string, name: string, rest: string) =>
+      `${prefix}## ${name.trim()}\n\n${rest}`,
+  );
+
   return out;
 }
 
