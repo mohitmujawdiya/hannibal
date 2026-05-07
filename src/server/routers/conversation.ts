@@ -52,6 +52,16 @@ export const conversationRouter = router({
     .mutation(async ({ ctx, input }) => {
       await assertResourceOwnership(ctx.db, "conversation", input.conversationId, ctx.userId);
 
+      // Guard: empty-payload syncs are a no-op. The procedure is delete-all-
+      // then-recreate, so without this guard any client-side bug that briefly
+      // produces an empty messages array (hydration race, useChat reset on
+      // remount, etc.) silently wipes the conversation. There is no legitimate
+      // use of syncMessages with no messages — clearing is a separate concern
+      // that should go through the `delete` mutation.
+      if (input.messages.length === 0) {
+        return { success: true, skipped: true };
+      }
+
       await ctx.db.$transaction(async (tx) => {
         // Delete all existing messages
         await tx.message.deleteMany({
@@ -59,18 +69,16 @@ export const conversationRouter = router({
         });
 
         // Create fresh messages
-        if (input.messages.length > 0) {
-          await tx.message.createMany({
-            data: input.messages.map((msg, i) => ({
-              role: msg.role,
-              content: msg.content,
-              metadata: { sdkId: msg.sdkId, parts: msg.parts ?? [] } as Prisma.InputJsonValue,
-              conversationId: input.conversationId,
-              // Stagger createdAt so ordering is deterministic
-              createdAt: new Date(Date.now() + i),
-            })),
-          });
-        }
+        await tx.message.createMany({
+          data: input.messages.map((msg, i) => ({
+            role: msg.role,
+            content: msg.content,
+            metadata: { sdkId: msg.sdkId, parts: msg.parts ?? [] } as Prisma.InputJsonValue,
+            conversationId: input.conversationId,
+            // Stagger createdAt so ordering is deterministic
+            createdAt: new Date(Date.now() + i),
+          })),
+        });
 
         // Touch conversation's updatedAt
         await tx.conversation.update({
