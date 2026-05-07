@@ -122,7 +122,16 @@ export async function POST(req: Request) {
   );
 
   const result = streamText({
-    model: openai(model),
+    // openai.chat() uses the stateless Chat Completions API. The default
+    // openai() factory uses the stateful Responses API, which echoes back
+    // server-side item IDs (msg_..., fc_...) in providerMetadata. Those IDs
+    // get persisted with the conversation and replayed on subsequent turns;
+    // when OpenAI's item store evicts one, every following message in that
+    // conversation 404s ("Item with id 'msg_...' not found"). The error is
+    // masked by toUIMessageStreamResponse, so the client sees an empty 200
+    // and the chat appears to stop responding. Chat Completions has no item
+    // IDs and no such failure mode.
+    model: openai.chat(model),
     system: systemPrompt,
     messages: modelMessages,
     tools: {
@@ -143,7 +152,16 @@ export async function POST(req: Request) {
     stopWhen: stepCountIs(8),
     temperature: temperatureFor(model),
     maxOutputTokens: 16384,
+    onError: ({ error }) => {
+      console.error("[chat] streamText error:", error);
+    },
   });
 
-  return result.toUIMessageStreamResponse();
+  // Surface stream errors to the client instead of letting the SDK swallow
+  // them into an empty 200 response. Without this, any mid-stream failure
+  // produces a ghost reply and the user has no signal to retry.
+  return result.toUIMessageStreamResponse({
+    onError: (error) =>
+      error instanceof Error ? error.message : "An error occurred while generating a response.",
+  });
 }
